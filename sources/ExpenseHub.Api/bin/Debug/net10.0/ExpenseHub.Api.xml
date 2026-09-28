@@ -1,0 +1,210 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>ExpenseHub.Api</name>
+    </assembly>
+    <members>
+        <member name="T:ExpenseHub.Api.Domain.Expense">
+            <summary>
+            Represents an expense submitted by an owner.
+            </summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.Expense.Id">
+            <summary>Gets or sets the unique identifier of the expense.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.Expense.OwnerId">
+            <summary>Gets or sets the identifier of the expense owner.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.Expense.Description">
+            <summary>Gets or sets the expense description.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.Expense.Amount">
+            <summary>Gets or sets the expense amount.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.Expense.ExpenseDate">
+            <summary>Gets or sets the date on which the expense occurred.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.Expense.Status">
+            <summary>Gets or sets the current approval status.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.Expense.ExpenseCategoryId">
+            <summary>Gets or sets the identifier of the expense category.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.Expense.Category">
+            <summary>Gets or sets the category associated with the expense.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.Expense.History">
+            <summary>Gets the history entries associated with the expense.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.Expense.Payment">
+            <summary>Gets or sets the payment record, if the expense has been paid.</summary>
+        </member>
+        <member name="T:ExpenseHub.Api.Domain.ExpenseCategory">
+            <summary>
+            Defines a category used to classify expenses.
+            </summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseCategory.Id">
+            <summary>Gets or sets the unique identifier of the category.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseCategory.Name">
+            <summary>Gets or sets the category name.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseCategory.Expenses">
+            <summary>Gets the expenses assigned to this category.</summary>
+        </member>
+        <member name="T:ExpenseHub.Api.Domain.ExpenseHistory">
+            <summary>
+            Records an action performed on an expense.
+            </summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseHistory.Id">
+            <summary>Gets or sets the unique identifier of the history entry.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseHistory.ExpenseId">
+            <summary>Gets or sets the identifier of the related expense.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseHistory.Expense">
+            <summary>Gets or sets the related expense.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseHistory.Action">
+            <summary>Gets or sets the action recorded in this entry.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseHistory.ActorId">
+            <summary>Gets or sets the identifier of the actor who performed the action.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseHistory.OccurredAtUtc">
+            <summary>Gets or sets the UTC time when the action occurred.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseHistory.PreviousStatus">
+            <summary>Gets or sets the status before the action, if available.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseHistory.NewStatus">
+            <summary>Gets or sets the status after the action, if available.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseHistory.RejectionReason">
+            <summary>Gets or sets the reason provided when the expense was rejected.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.ExpenseHistory.Changes">
+            <summary>Gets or sets serialized details of the changes.</summary>
+        </member>
+        <member name="T:ExpenseHub.Api.Domain.ExpenseStatus">
+            <summary>
+            Defines the lifecycle states of an expense.
+            </summary>
+        </member>
+        <member name="F:ExpenseHub.Api.Domain.ExpenseStatus.Draft">
+            <summary>The expense is being drafted.</summary>
+        </member>
+        <member name="F:ExpenseHub.Api.Domain.ExpenseStatus.Submitted">
+            <summary>The expense has been submitted for review.</summary>
+        </member>
+        <member name="F:ExpenseHub.Api.Domain.ExpenseStatus.Approved">
+            <summary>The expense has been approved.</summary>
+        </member>
+        <member name="F:ExpenseHub.Api.Domain.ExpenseStatus.Rejected">
+            <summary>The expense has been rejected.</summary>
+        </member>
+        <member name="F:ExpenseHub.Api.Domain.ExpenseStatus.Paid">
+            <summary>The expense has been paid.</summary>
+        </member>
+        <member name="T:ExpenseHub.Api.Domain.PaymentRecord">
+            <summary>
+            Records payment of an expense.
+            </summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.PaymentRecord.Id">
+            <summary>Gets or sets the unique identifier of the payment record.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.PaymentRecord.ExpenseId">
+            <summary>Gets or sets the identifier of the paid expense.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.PaymentRecord.Expense">
+            <summary>Gets or sets the related expense.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.PaymentRecord.ActorId">
+            <summary>Gets or sets the identifier of the actor who recorded the payment.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Domain.PaymentRecord.PaidAtUtc">
+            <summary>Gets or sets the UTC time when payment was recorded.</summary>
+        </member>
+        <member name="T:ExpenseHub.Api.Persistence.ExpenseHubDbContext">
+            <summary>
+            Provides Entity Framework access to ExpenseHub data.
+            </summary>
+        </member>
+        <member name="M:ExpenseHub.Api.Persistence.ExpenseHubDbContext.#ctor(Microsoft.EntityFrameworkCore.DbContextOptions{ExpenseHub.Api.Persistence.ExpenseHubDbContext})">
+            <summary>Initializes a new instance of the <see cref="T:ExpenseHub.Api.Persistence.ExpenseHubDbContext"/> class.</summary>
+            <param name="options">The options for this context.</param>
+        </member>
+        <member name="P:ExpenseHub.Api.Persistence.ExpenseHubDbContext.Expenses">
+            <summary>Gets the expenses in the database.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Persistence.ExpenseHubDbContext.ExpenseCategories">
+            <summary>Gets the expense categories in the database.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Persistence.ExpenseHubDbContext.ExpenseHistories">
+            <summary>Gets the expense history entries in the database.</summary>
+        </member>
+        <member name="P:ExpenseHub.Api.Persistence.ExpenseHubDbContext.PaymentRecords">
+            <summary>Gets the payment records in the database.</summary>
+        </member>
+        <member name="M:ExpenseHub.Api.Persistence.ExpenseHubDbContext.OnModelCreating(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:ExpenseHub.Api.Program">
+            <summary>
+            Defines the application entry point.
+            </summary>
+        </member>
+        <member name="M:ExpenseHub.Api.Program.Main(System.String[])">
+            <summary>Builds and runs the ExpenseHub API.</summary>
+            <param name="args">The command-line arguments.</param>
+            <returns>A task that represents the lifetime of the API application.</returns>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Type)">
+            <summary>
+            Generates a documentation comment ID for a type.
+            Example: T:Namespace.Outer+Inner`1 becomes T:Namespace.Outer.Inner`1
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Reflection.PropertyInfo)">
+            <summary>
+            Generates a documentation comment ID for a property.
+            Example: P:Namespace.ContainingType.PropertyName or for an indexer P:Namespace.ContainingType.Item(System.Int32)
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Type,System.String)">
+            <summary>
+            Generates a documentation comment ID for a property given its container type and property name.
+            Example: P:Namespace.ContainingType.PropertyName
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Reflection.MethodInfo)">
+            <summary>
+            Generates a documentation comment ID for a method (or constructor).
+            For example:
+              M:Namespace.ContainingType.MethodName(ParamType1,ParamType2)~ReturnType
+              M:Namespace.ContainingType.#ctor(ParamType)
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.GetTypeDocId(System.Type,System.Boolean,System.Boolean)">
+            <summary>
+            Generates a documentation ID string for a type.
+            This method handles nested types (replacing '+' with '.'),
+            generic types, arrays, pointers, by-ref types, and generic parameters.
+            The <paramref name="includeGenericArguments"/> flag controls whether
+            constructed generic type arguments are emitted, while <paramref name="omitGenericArity"/>
+            controls whether the generic arity marker (e.g. "`1") is appended.
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.NormalizeDocId(System.String)">
+            <summary>
+            Normalizes a documentation comment ID to match the compiler-style format.
+            Strips the return type suffix for ordinary methods but retains it for conversion operators.
+            </summary>
+            <param name="docId">The documentation comment ID to normalize.</param>
+            <returns>The normalized documentation comment ID.</returns>
+        </member>
+    </members>
+</doc>
