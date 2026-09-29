@@ -1,13 +1,15 @@
 namespace ExpenseHub.Api.Persistence;
 
 using ExpenseHub.Api.Domain;
+using ExpenseHub.Api.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 /// <summary>
-/// Provides Entity Framework access to ExpenseHub data.
+/// Provides Entity Framework access to ExpenseHub and identity data.
 /// </summary>
-internal sealed class ExpenseHubDbContext : DbContext
+internal sealed class ExpenseHubDbContext : IdentityDbContext<AppUser>
 {
     /// <summary>Initializes a new instance of the <see cref="ExpenseHubDbContext"/> class.</summary>
     /// <param name="options">The options for this context.</param>
