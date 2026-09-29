@@ -5,10 +5,98 @@ Accept: application/json
 
 ###
 
-# Depois de configurar SeedAdmin:Email e SeedAdmin:Password localmente,
-# faça POST /login com o email e senha configurados.
-# O retorno inclui accessToken e refreshToken.
-#
-# Com o accessToken:
-# GET /api/admin/health
-# Authorization: Bearer <accessToken>
+# Public registration. The extra role property is intentionally ignored.
+@newUserPassword = REPLACE_WITH_VALID_PASSWORD
+
+POST {{ExpenseHub_Api_HostAddress}}/register
+Content-Type: application/json
+
+{
+	"email": "employee@example.com",
+	"password": "{{newUserPassword}}",
+	"role": "Admin"
+}
+
+###
+
+# Login as the registered user or the locally configured SeedAdmin.
+POST {{ExpenseHub_Api_HostAddress}}/login
+Content-Type: application/json
+
+{
+	"email": "employee@example.com",
+	"password": "{{newUserPassword}}"
+}
+
+###
+
+# Set @adminAccessToken to a valid Admin bearer token before running Admin requests.
+@adminAccessToken = REPLACE_WITH_ADMIN_ACCESS_TOKEN
+@userAccessToken = REPLACE_WITH_STANDARD_USER_ACCESS_TOKEN
+
+GET {{ExpenseHub_Api_HostAddress}}/api/admin/users
+Authorization: Bearer {{adminAccessToken}}
+Accept: application/json
+
+###
+
+# A standard user's token should receive 403 here.
+GET {{ExpenseHub_Api_HostAddress}}/api/admin/users
+Authorization: Bearer {{userAccessToken}}
+Accept: application/json
+
+###
+
+# Roles is the complete desired role set for this user.
+# After changing roles, the affected user must log in again to get updated token claims.
+PUT {{ExpenseHub_Api_HostAddress}}/api/admin/users/REPLACE_WITH_USER_ID/roles
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+	"roles": ["Employee"]
+}
+
+###
+
+# Send an empty set to remove Employee from this user.
+PUT {{ExpenseHub_Api_HostAddress}}/api/admin/users/REPLACE_WITH_USER_ID/roles
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+	"roles": []
+}
+
+###
+
+# A role outside the allowlist is rejected with 400.
+PUT {{ExpenseHub_Api_HostAddress}}/api/admin/users/REPLACE_WITH_USER_ID/roles
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+	"roles": ["UnknownRole"]
+}
+
+###
+
+# A valid role set for a missing user should return 404.
+PUT {{ExpenseHub_Api_HostAddress}}/api/admin/users/DOES_NOT_EXIST/roles
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+	"roles": ["Employee"]
+}
+
+###
+
+# Removing Admin from the current Admin should return 409.
+PUT {{ExpenseHub_Api_HostAddress}}/api/admin/users/REPLACE_WITH_ADMIN_USER_ID/roles
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+	"roles": []
+}

@@ -69,6 +69,7 @@ internal static class Program
             .WithName("GetHealth");
 
         app.MapAuthEndpoints();
+        app.MapUserEndpoints();
 
         app.MapGet(
                 "/api/admin/health",
