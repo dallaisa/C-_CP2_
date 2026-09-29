@@ -1,37 +1,63 @@
-# ExpenseHub — Etapa I01
+# ExpenseHub — I01 + I02
 
-Versão preparada a partir do template do checkpoint para concluir a **I01 — Fundação da solução e Entity Framework Core**.
+Versão preparada para concluir:
 
-## Implementado
+- **I01 — Fundação da solução e Entity Framework Core**
+- **I02 — Identity, Admin e autenticação**
 
-- solução `ExpenseHub.slnx` mantida com API e projeto de testes;
+## I01 implementada
+
+- API e projeto de testes mantidos na solução;
 - Entity Framework Core com SQLite;
-- `ExpenseHubDbContext`;
 - entidades mínimas `Expense`, `ExpenseCategory`, `ExpenseHistory` e `PaymentRecord`;
-- relacionamentos, limites de tamanho, precisão monetária e índice único de pagamento;
-- banco SQLite local criado automaticamente com `EnsureCreatedAsync`;
-- arquivos locais do SQLite ignorados pelo Git;
-- endpoint original `GET /health` preservado.
+- `ExpenseHubDbContext` com mapeamentos relacionais;
+- persistência local em `expensehub.db`;
+- arquivos SQLite ignorados pelo Git;
+- criação reproduzível do banco com `EnsureCreatedAsync`.
 
-## Banco de dados
+## I02 implementada
+
+- ASP.NET Core Identity persistido no mesmo banco relacional;
+- roles `Admin`, `Employee`, `Approver`, `Finance` e `Auditor`;
+- seed idempotente das roles;
+- seed de **somente uma conta Admin**;
+- senha do Admin fora do código e fora do `appsettings.json`;
+- autenticação bearer;
+- `POST /login`;
+- rota de verificação `GET /api/admin/health` protegida por role `Admin`;
+- usuário anônimo recebe `401`;
+- usuário autenticado sem role Admin recebe `403`.
+
+> A rota `/api/admin/health` é apenas uma evidência temporária da I02. Na I03 ela pode ser substituída pelas rotas administrativas obrigatórias.
+
+## Banco
 
 Provider: SQLite.
 
-Pacotes:
+Pacotes principais:
+
 - `Microsoft.EntityFrameworkCore.Sqlite` 10.0.12
 - `Microsoft.EntityFrameworkCore.Design` 10.0.12
+- `Microsoft.AspNetCore.Identity.EntityFrameworkCore` 10.0.12
 
-A connection string local não contém segredo e está em `appsettings.json`.
+Na primeira execução, `expensehub.db` é criado automaticamente.
 
-Na primeira execução, o arquivo `expensehub.db` é criado automaticamente e não deve ser versionado.
+Se você já executou a versão da I01 antes de aplicar a I02, apague **apenas o arquivo local `expensehub.db`** uma vez antes de iniciar a I02. Ele é ignorado pelo Git e a I02 adiciona as tabelas do Identity.
 
-Para alterações futuras de schema, o projeto já possui o pacote de design do EF Core. Antes da entrega final, migrations podem ser adotadas com:
+## Configurar o Admin sem versionar senha
+
+O projeto usa .NET User Secrets.
+
+No terminal, na raiz do repositório:
 
 ```shell
-dotnet tool install --global dotnet-ef
-dotnet ef migrations add NomeDaMigration --project ./sources/ExpenseHub.Api/ExpenseHub.Api.csproj
-dotnet ef database update --project ./sources/ExpenseHub.Api/ExpenseHub.Api.csproj
+dotnet user-secrets set "SeedAdmin:Email" "admin@expensehub.local" --project ./sources/ExpenseHub.Api/ExpenseHub.Api.csproj
+dotnet user-secrets set "SeedAdmin:Password" "$ADMIN_PASSWORD" --project ./sources/ExpenseHub.Api/ExpenseHub.Api.csproj
 ```
+
+No PowerShell, prefira informar a senha pela sua sessão local em vez de escrevê-la em arquivo versionado.
+
+Não coloque a senha no README, `appsettings.json`, `.http`, commit ou pull request.
 
 ## Executar
 
@@ -42,20 +68,31 @@ dotnet test ./sources/ExpenseHub.slnx
 dotnet run --project ./sources/ExpenseHub.Api/ExpenseHub.Api.csproj
 ```
 
-Depois, teste:
+## Validar I02
+
+1. Inicie a aplicação.
+2. Faça `POST /login` com o Admin configurado.
+3. Guarde o `accessToken` retornado.
+4. Faça `GET /api/admin/health` com `Authorization: Bearer <accessToken>`.
+5. Sem token, a rota deve retornar `401`.
+6. Com usuário autenticado sem role Admin, a rota deve retornar `403` quando a I03 disponibilizar cadastro/roles.
+
+## GitHub
+
+Para I01:
 
 ```text
-GET http://localhost:5245/health
+branch: i01-foundation-ef
+PR: I01 — Fundação da solução e Entity Framework Core
+referência: Racass/checkpoint-csharpracass-expensehub#1
 ```
 
-## Issue
-
-Branch sugerida: `i01-foundation-ef`
-
-Na pull request, referencie:
+Para I02:
 
 ```text
-Racass/checkpoint-csharpracass-expensehub#1
+branch: i02-identity-auth
+PR: I02 — Identity, Admin e autenticação
+referência: Racass/checkpoint-csharpracass-expensehub#2
 ```
 
-Não use `Closes`, `Fixes` ou `Resolves`.
+Não use `Closes`, `Fixes` ou `Resolves` nas referências ao backlog central.

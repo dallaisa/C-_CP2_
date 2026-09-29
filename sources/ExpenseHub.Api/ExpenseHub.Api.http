@@ -4,3 +4,11 @@ GET {{ExpenseHub_Api_HostAddress}}/health
 Accept: application/json
 
 ###
+
+# Depois de configurar SeedAdmin:Email e SeedAdmin:Password localmente,
+# faça POST /login com o email e senha configurados.
+# O retorno inclui accessToken e refreshToken.
+#
+# Com o accessToken:
+# GET /api/admin/health
+# Authorization: Bearer <accessToken>
