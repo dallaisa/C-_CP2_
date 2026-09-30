@@ -23,17 +23,22 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
     private static readonly string[] InvalidCategoryErrors = new[] { "CategoryId must be a valid category." };
 
     /// <summary>Creates a draft expense owned by the authenticated user.</summary>
-    /// <param name="ownerId">The identifier of the authenticated user.</param>
+    /// <param name="actor">The authenticated user, who becomes the owner.</param>
     /// <param name="request">The draft values sent by the client.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The operation result.</returns>
     internal async Task<ExpenseOperationResult> CreateDraftAsync(
-        string ownerId,
+        ExpenseViewer actor,
         ExpenseRequest request,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
+        ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(request);
+
+        if (!actor.IsEmployee || string.IsNullOrWhiteSpace(actor.UserId))
+        {
+            return ExpenseOperationResult.Forbidden();
+        }
 
         DateTimeOffset nowUtc = timeProvider.GetUtcNow();
         Dictionary<string, string[]> errors =
@@ -50,7 +55,7 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
             return InvalidCategory();
         }
 
-        Expense expense = ExpenseDraftRules.CreateDraft(ownerId, values, nowUtc);
+        Expense expense = ExpenseDraftRules.CreateDraft(actor.UserId, values, nowUtc);
         expense.Category = category;
 
         // The expense and its history entry are saved by the same SaveChanges call.
@@ -62,17 +67,17 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
 
     /// <summary>Edits a draft expense owned by the authenticated user.</summary>
     /// <param name="expenseId">The identifier of the expense to edit.</param>
-    /// <param name="actorId">The identifier of the authenticated user.</param>
+    /// <param name="actor">The authenticated user.</param>
     /// <param name="request">The draft values sent by the client.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The operation result.</returns>
     internal async Task<ExpenseOperationResult> UpdateDraftAsync(
         Guid expenseId,
-        string actorId,
+        ExpenseViewer actor,
         ExpenseRequest request,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(actorId);
+        ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(request);
 
         DateTimeOffset nowUtc = timeProvider.GetUtcNow();
@@ -83,19 +88,11 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
             return ExpenseOperationResult.Invalid(errors);
         }
 
-        // Ownership is part of the query: another user's expense is indistinguishable from a missing one.
-        Expense? expense = await dbContext.Expenses
-            .FirstOrDefaultAsync(
-                item => item.Id == expenseId && item.OwnerId == actorId,
-                cancellationToken);
-        if (expense is null)
+        Expense? expense = await FindOwnedAsync(dbContext, expenseId, actor, includeCategory: false, cancellationToken);
+        ExpenseAccessDecision decision = ExpenseAccessPolicy.EvaluateDraftChange(actor, expense);
+        if (decision != ExpenseAccessDecision.Allowed)
         {
-            return ExpenseOperationResult.NotFound();
-        }
-
-        if (expense.Status != ExpenseStatus.Draft)
-        {
-            return ExpenseOperationResult.Conflict(EditConflictMessage);
+            return FromDecision(decision, EditConflictMessage);
         }
 
         ExpenseDraftValues values = ExpenseRequestValidator.ToDraftValues(request);
@@ -105,7 +102,7 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
             return InvalidCategory();
         }
 
-        DraftEditOutcome outcome = ExpenseDraftRules.EditDraft(expense, actorId, values, nowUtc);
+        DraftEditOutcome outcome = ExpenseDraftRules.EditDraft(expense!, actor.UserId, values, nowUtc);
         if (outcome == DraftEditOutcome.NotOwner)
         {
             return ExpenseOperationResult.NotFound();
@@ -116,7 +113,7 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
             return ExpenseOperationResult.Conflict(EditConflictMessage);
         }
 
-        expense.Category = category;
+        expense!.Category = category;
 
         // The changed expense and its history entry are saved by the same SaveChanges call.
         if (outcome == DraftEditOutcome.Updated
@@ -130,34 +127,31 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
 
     /// <summary>Submits a draft expense owned by the authenticated user.</summary>
     /// <param name="expenseId">The identifier of the expense to submit.</param>
-    /// <param name="actorId">The identifier of the authenticated user.</param>
+    /// <param name="actor">The authenticated user.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The operation result.</returns>
     internal async Task<ExpenseOperationResult> SubmitAsync(
         Guid expenseId,
-        string actorId,
+        ExpenseViewer actor,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(actorId);
+        ArgumentNullException.ThrowIfNull(actor);
 
-        // Ownership is part of the query: another user's expense is indistinguishable from a missing one.
-        Expense? expense = await dbContext.Expenses
-            .Include(item => item.Category)
-            .FirstOrDefaultAsync(
-                item => item.Id == expenseId && item.OwnerId == actorId,
-                cancellationToken);
-        if (expense is null)
+        Expense? expense = await FindOwnedAsync(dbContext, expenseId, actor, includeCategory: true, cancellationToken);
+        ExpenseAccessDecision decision = ExpenseAccessPolicy.EvaluateDraftChange(actor, expense);
+
+        // A repeated submission finds the expense outside Draft and records nothing.
+        if (decision != ExpenseAccessDecision.Allowed)
         {
-            return ExpenseOperationResult.NotFound();
+            return FromDecision(decision, SubmitConflictMessage);
         }
 
-        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense, actorId, timeProvider.GetUtcNow());
+        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense!, actor.UserId, timeProvider.GetUtcNow());
         if (outcome == DraftSubmitOutcome.NotOwner)
         {
             return ExpenseOperationResult.NotFound();
         }
 
-        // A repeated submission finds the expense outside Draft and records nothing.
         if (outcome == DraftSubmitOutcome.NotDraft)
         {
             return ExpenseOperationResult.Conflict(SubmitConflictMessage);
@@ -169,7 +163,7 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
             return ExpenseOperationResult.Conflict(SubmitConflictMessage);
         }
 
-        return ExpenseOperationResult.Success(expense);
+        return ExpenseOperationResult.Success(expense!);
     }
 
     /// <summary>Lists the expenses visible to the authenticated user.</summary>
@@ -215,6 +209,34 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
         {
             [nameof(ExpenseRequest.CategoryId)] = InvalidCategoryErrors,
         });
+
+    private static ExpenseOperationResult FromDecision(ExpenseAccessDecision decision, string conflictMessage) =>
+        decision switch
+        {
+            ExpenseAccessDecision.Forbidden => ExpenseOperationResult.Forbidden(),
+            ExpenseAccessDecision.Conflict => ExpenseOperationResult.Conflict(conflictMessage),
+            _ => ExpenseOperationResult.NotFound(),
+        };
+
+    private static Task<Expense?> FindOwnedAsync(
+        ExpenseHubDbContext context,
+        Guid expenseId,
+        ExpenseViewer actor,
+        bool includeCategory,
+        CancellationToken cancellationToken)
+    {
+        // Ownership is part of the query: another user's expense is indistinguishable from a missing one.
+        string ownerId = actor.UserId;
+        IQueryable<Expense> query = context.Expenses;
+        if (includeCategory)
+        {
+            query = query.Include(item => item.Category);
+        }
+
+        return query.FirstOrDefaultAsync(
+            item => item.Id == expenseId && item.OwnerId == ownerId,
+            cancellationToken);
+    }
 
     private static async Task<bool> TrySaveAsync(
         ExpenseHubDbContext context,

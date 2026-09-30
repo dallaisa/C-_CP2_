@@ -16,4 +16,7 @@ internal enum ExpenseOperationStatus
 
     /// <summary>The expense is in a state that does not allow the operation.</summary>
     Conflict = 3,
+
+    /// <summary>The caller can see the expense but is not allowed to perform the operation.</summary>
+    Forbidden = 4,
 }
