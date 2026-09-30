@@ -97,7 +97,7 @@ internal sealed class ExpenseHubDbContext : IdentityDbContext<AppUser>
             .HasMaxLength(500);
 
         builder.Property(history => history.Changes)
-            .HasMaxLength(2000);
+            .HasMaxLength(4000);
 
         builder.HasOne(history => history.Expense)
             .WithMany(expense => expense.History)

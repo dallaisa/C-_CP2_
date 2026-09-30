@@ -1,10 +1,11 @@
-# ExpenseHub — I01 + I02 + I03
+# ExpenseHub — I01 + I02 + I03 + I04
 
 Versão preparada para concluir:
 
 - **I01 — Fundação da solução e Entity Framework Core**
 - **I02 — Identity, Admin e autenticação**
 - **I03 — Cadastro HTTP e gerenciamento de roles**
+- **I04 — Criar e editar rascunho**
 
 ## I01 implementada
 
@@ -50,6 +51,49 @@ Versão preparada para concluir:
 - entrada ou role inválida retorna `400 Bad Request`;
 - o Admin autenticado não pode remover de si mesmo a própria role `Admin`, retornando `409 Conflict`;
 - após alteração de roles, o usuário deve realizar um novo login para que o novo token reflita suas permissões atualizadas.
+
+## I04 implementada
+
+- `POST /api/expenses` cria um reembolso sempre em `Draft`, restrito à role `Employee`;
+- `PUT /api/expenses/{id}` edita somente um `Draft` do próprio usuário, restrito à role `Employee`;
+- identificador gerado pelo servidor;
+- proprietário obtido exclusivamente do token (`ClaimTypes.NameIdentifier`);
+- a API recebe o DTO `ExpenseRequest` com apenas `description`, `amount`, `expenseDate` e `categoryId`;
+  campos como `id`, `ownerId`, `status`, ator ou horários enviados pelo cliente são ignorados;
+- validações:
+  - descrição obrigatória, entre 10 e 500 caracteres (espaços nas pontas não contam);
+  - valor `decimal` entre `0.01` e `2147483647` (`Int32.MaxValue`), com no máximo 2 casas decimais;
+  - data da despesa válida e não futura (data UTC do servidor);
+  - categoria existente;
+- regras de ownership e estado aplicadas no `ExpenseService` e em `ExpenseDraftRules`;
+- histórico (`ExpenseHistory`) gravado na mesma chamada de `SaveChanges` da alteração:
+  - `Created` na criação (ator, instante UTC, estado anterior nulo, estado posterior `Draft`);
+  - `Updated` em cada edição com alteração real, com os campos alterados em JSON (`from`/`to`);
+  - edição sem alteração não gera histórico.
+
+### Respostas
+
+| Situação | Status |
+|---|---|
+| Criação válida | `201 Created` |
+| Edição válida | `200 OK` |
+| Entrada inválida | `400 Bad Request` (`ValidationProblem`) |
+| Sem token | `401 Unauthorized` |
+| Autenticado sem role `Employee` | `403 Forbidden` |
+| Reembolso inexistente ou de outro usuário | `404 Not Found` |
+| Reembolso fora de `Draft` | `409 Conflict` |
+
+### Categorias
+
+As categorias são criadas de forma idempotente na inicialização:
+
+| Id | Nome |
+|---:|---|
+| 1 | Alimentação |
+| 2 | Transporte |
+| 3 | Hospedagem |
+| 4 | Material de escritório |
+| 5 | Outros |
 
 ## Banco de dados
 
@@ -221,6 +265,55 @@ Após uma alteração de role, o usuário deve realizar um novo login para receb
 - usuário inexistente retorna `404 Not Found`;
 - Admin tentando remover sua própria role `Admin` recebe `409 Conflict`.
 
+## Validar I04
+
+Use um usuário com a role `Employee` (atribuída pelo Admin) e faça login novamente após a atribuição.
+
+### Criar rascunho
+
+```http
+POST /api/expenses
+Authorization: Bearer <EmployeeToken>
+Content-Type: application/json
+```
+
+```json
+{
+  "description": "Almoço com cliente",
+  "amount": 150.75,
+  "expenseDate": "2026-09-30",
+  "categoryId": 1
+}
+```
+
+### Editar rascunho
+
+```http
+PUT /api/expenses/{id}
+Authorization: Bearer <EmployeeToken>
+Content-Type: application/json
+```
+
+```json
+{
+  "description": "Jantar com cliente",
+  "amount": 200.00,
+  "expenseDate": "2026-09-30",
+  "categoryId": 2
+}
+```
+
+### Casos validados
+
+- Employee cria `Draft` com proprietário do token: `201 Created`;
+- criação sem autenticação: `401 Unauthorized`;
+- usuário sem `Employee` (inclusive Admin): `403 Forbidden`;
+- descrição fora dos limites, valor inválido, data futura ou categoria inexistente: `400 Bad Request`;
+- `ownerId`, `status` ou `id` enviados pelo cliente não alteram os dados controlados pelo servidor;
+- proprietário edita o próprio `Draft`: `200 OK`;
+- outro Employee tentando editar: `404 Not Found`;
+- edição de reembolso fora de `Draft`: `409 Conflict`.
+
 ## Qualidade e segurança
 
 O projeto não deve versionar:
@@ -282,6 +375,14 @@ referência: Racass/checkpoint-csharpracass-expensehub#2
 branch: i03-user-roles
 PR: I03 — Cadastro HTTP e gerenciamento de roles
 referência: Racass/checkpoint-csharpracass-expensehub#3
+```
+
+### I04
+
+```text
+branch: i04-expense-draft
+PR: I04 — Criar e editar rascunho
+referência: Racass/checkpoint-csharpracass-expensehub#4
 ```
 
 Não use `Closes`, `Fixes` ou `Resolves` nas referências ao backlog central.

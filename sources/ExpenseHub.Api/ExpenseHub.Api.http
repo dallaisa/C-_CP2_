@@ -100,3 +100,80 @@ Content-Type: application/json
 {
 	"roles": []
 }
+
+###
+
+# I04 — Set @employeeAccessToken to a token of a user with the Employee role.
+@employeeAccessToken = REPLACE_WITH_EMPLOYEE_ACCESS_TOKEN
+@otherEmployeeAccessToken = REPLACE_WITH_OTHER_EMPLOYEE_ACCESS_TOKEN
+@expenseId = REPLACE_WITH_EXPENSE_ID
+
+# Create a draft. Owner, status and id are always set by the server.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{employeeAccessToken}}
+Content-Type: application/json
+
+{
+	"description": "Almoço com cliente",
+	"amount": 150.75,
+	"expenseDate": "2026-09-30",
+	"categoryId": 1
+}
+
+###
+
+# Extra fields such as ownerId and status are ignored.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{employeeAccessToken}}
+Content-Type: application/json
+
+{
+	"ownerId": "someone-else",
+	"status": "Paid",
+	"description": "Tentativa de mass assignment",
+	"amount": 10,
+	"expenseDate": "2026-09-30",
+	"categoryId": 2
+}
+
+###
+
+# Invalid description, amount and future date should return 400.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{employeeAccessToken}}
+Content-Type: application/json
+
+{
+	"description": "curta",
+	"amount": 0,
+	"expenseDate": "2999-01-01",
+	"categoryId": 1
+}
+
+###
+
+# The owner edits their own draft.
+PUT {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
+Authorization: Bearer {{employeeAccessToken}}
+Content-Type: application/json
+
+{
+	"description": "Jantar com cliente",
+	"amount": 200.00,
+	"expenseDate": "2026-09-30",
+	"categoryId": 2
+}
+
+###
+
+# Another Employee cannot see or edit the draft: 404.
+PUT {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
+Authorization: Bearer {{otherEmployeeAccessToken}}
+Content-Type: application/json
+
+{
+	"description": "Edição indevida de outro usuário",
+	"amount": 1,
+	"expenseDate": "2026-09-30",
+	"categoryId": 1
+}

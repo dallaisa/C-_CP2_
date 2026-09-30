@@ -1,7 +1,9 @@
 namespace ExpenseHub.Api;
 
+using System;
 using System.Threading.Tasks;
 using ExpenseHub.Api.Endpoints;
+using ExpenseHub.Api.Expenses;
 using ExpenseHub.Api.Identity;
 using ExpenseHub.Api.Persistence;
 using Microsoft.AspNetCore.Builder;
@@ -28,6 +30,9 @@ internal static class Program
             ?? "Data Source=expensehub.db";
 
         builder.Services.AddOpenApi();
+        builder.Services.AddProblemDetails();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddScoped<ExpenseService>();
 
         builder.Services.AddDbContext<ExpenseHubDbContext>(
             options => options.UseSqlite(connectionString));
@@ -70,6 +75,7 @@ internal static class Program
 
         app.MapAuthEndpoints();
         app.MapUserEndpoints();
+        app.MapExpenseEndpoints();
 
         app.MapGet(
                 "/api/admin/health",
