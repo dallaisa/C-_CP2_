@@ -1,9 +1,12 @@
 namespace ExpenseHub.Api.Endpoints;
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using ExpenseHub.Api.Domain;
 using ExpenseHub.Api.Expenses;
 using ExpenseHub.Api.Identity;
 using Microsoft.AspNetCore.Builder;
@@ -15,6 +18,14 @@ using Microsoft.AspNetCore.Routing;
 /// </summary>
 internal static class ExpenseEndpoints
 {
+    private static readonly string[] ReaderRoles =
+    [
+        ApplicationRoles.Employee,
+        ApplicationRoles.Approver,
+        ApplicationRoles.Finance,
+        ApplicationRoles.Auditor,
+    ];
+
     /// <summary>Maps expense endpoints.</summary>
     /// <param name="endpoints">The endpoint route builder.</param>
     /// <returns>The endpoint route builder with expense routes mapped.</returns>
@@ -26,6 +37,16 @@ internal static class ExpenseEndpoints
 
         endpoints.MapPut("/api/expenses/{id:guid}", UpdateDraftAsync)
             .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Employee));
+
+        endpoints.MapPost("/api/expenses/{id:guid}/submit", SubmitAsync)
+            .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Employee));
+
+        // Admin is intentionally absent: it grants no functional access to expenses.
+        endpoints.MapGet("/api/expenses", ListAsync)
+            .RequireAuthorization(policy => policy.RequireRole(ReaderRoles));
+
+        endpoints.MapGet("/api/expenses/{id:guid}", GetByIdAsync)
+            .RequireAuthorization(policy => policy.RequireRole(ReaderRoles));
 
         return endpoints;
     }
@@ -79,6 +100,81 @@ internal static class ExpenseEndpoints
         return ToProblem(result);
     }
 
+    private static async Task<IResult> SubmitAsync(
+        Guid id,
+        ClaimsPrincipal principal,
+        ExpenseService expenseService,
+        CancellationToken cancellationToken)
+    {
+        string? actorId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(actorId))
+        {
+            return Results.Unauthorized();
+        }
+
+        ExpenseOperationResult result =
+            await expenseService.SubmitAsync(id, actorId, cancellationToken);
+
+        if (result.Status == ExpenseOperationStatus.Success && result.Expense is not null)
+        {
+            return Results.Ok(ExpenseResponse.FromExpense(result.Expense));
+        }
+
+        return ToProblem(result);
+    }
+
+    private static async Task<IResult> ListAsync(
+        ClaimsPrincipal principal,
+        ExpenseService expenseService,
+        CancellationToken cancellationToken)
+    {
+        ExpenseViewer? viewer = CreateViewer(principal);
+        if (viewer is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        List<Expense> expenses = await expenseService.ListVisibleAsync(viewer, cancellationToken);
+        return Results.Ok(expenses.Select(ExpenseResponse.FromExpense).ToList());
+    }
+
+    private static async Task<IResult> GetByIdAsync(
+        Guid id,
+        ClaimsPrincipal principal,
+        ExpenseService expenseService,
+        CancellationToken cancellationToken)
+    {
+        ExpenseViewer? viewer = CreateViewer(principal);
+        if (viewer is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        // A missing expense and one outside the viewer's scope produce the same response.
+        Expense? expense = await expenseService.FindVisibleAsync(id, viewer, cancellationToken);
+        return expense is null
+            ? ToProblem(ExpenseOperationResult.NotFound())
+            : Results.Ok(ExpenseResponse.FromExpense(expense));
+    }
+
+    private static ExpenseViewer? CreateViewer(ClaimsPrincipal principal)
+    {
+        string? userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return null;
+        }
+
+        return new ExpenseViewer
+        {
+            UserId = userId,
+            IsEmployee = principal.IsInRole(ApplicationRoles.Employee),
+            IsApprover = principal.IsInRole(ApplicationRoles.Approver),
+            IsFinance = principal.IsInRole(ApplicationRoles.Finance),
+            IsAuditor = principal.IsInRole(ApplicationRoles.Auditor),
+        };
+    }
+
     private static IResult ToProblem(ExpenseOperationResult result) =>
         result.Status switch
         {
@@ -88,7 +184,7 @@ internal static class ExpenseEndpoints
                 title: "Expense not found."),
             ExpenseOperationStatus.Conflict => Results.Problem(
                 statusCode: StatusCodes.Status409Conflict,
-                title: "Only expenses in Draft can be edited."),
+                title: result.Message ?? "The expense state does not allow this operation."),
             _ => Results.Problem(
                 statusCode: StatusCodes.Status500InternalServerError,
                 title: "Unexpected expense operation result."),

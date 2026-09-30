@@ -1,4 +1,4 @@
-# ExpenseHub — I01 + I02 + I03 + I04
+# ExpenseHub — I01 a I05
 
 Versão preparada para concluir:
 
@@ -6,6 +6,7 @@ Versão preparada para concluir:
 - **I02 — Identity, Admin e autenticação**
 - **I03 — Cadastro HTTP e gerenciamento de roles**
 - **I04 — Criar e editar rascunho**
+- **I05 — Enviar, listar e consultar**
 
 ## I01 implementada
 
@@ -94,6 +95,41 @@ As categorias são criadas de forma idempotente na inicialização:
 | 3 | Hospedagem |
 | 4 | Material de escritório |
 | 5 | Outros |
+
+## I05 implementada
+
+- `POST /api/expenses/{id}/submit` executa `Draft → Submitted`, restrito à role `Employee` e ao proprietário;
+- o estado é definido exclusivamente pelo servidor; o endpoint não recebe corpo;
+- repetir o envio ou enviar fora de `Draft` retorna `409 Conflict` sem gravar histórico;
+- o `UPDATE` do envio só é aplicado se o estado no banco ainda for o lido (`Status` como token de concorrência),
+  então dois envios simultâneos não geram histórico duplicado;
+- histórico `Submitted` com reembolso, ator do token, instante UTC do servidor, estado anterior `Draft` e posterior `Submitted`,
+  gravado na mesma chamada de `SaveChanges`;
+- `GET /api/expenses` e `GET /api/expenses/{id}` aplicam a mesma matriz de visibilidade (`ExpenseVisibility`):
+
+| Role | Reembolsos visíveis |
+|---|---|
+| `Employee` | somente os próprios |
+| `Approver` | somente `Submitted` |
+| `Finance` | somente `Approved` e `Paid` |
+| `Auditor` | todos |
+| `Admin` | nenhum (`403`), pois Admin não concede acesso funcional |
+
+- roles acumuladas recebem a união das permissões;
+- o filtro é uma expressão traduzida pelo Entity Framework para o `WHERE` do SQL, antes de materializar os dados;
+- consultas assíncronas e `AsNoTracking`;
+- reembolso inexistente ou fora do escopo retorna `404 Not Found`, sem distinguir os dois casos.
+
+### Respostas da I05
+
+| Situação | Status |
+|---|---|
+| Envio válido / consulta visível | `200 OK` |
+| Sem token | `401 Unauthorized` |
+| Envio sem role `Employee` | `403 Forbidden` |
+| Consulta sem `Employee`, `Approver`, `Finance` ou `Auditor` | `403 Forbidden` |
+| Reembolso inexistente, de outro Employee ou fora do escopo | `404 Not Found` |
+| Envio repetido ou fora de `Draft` | `409 Conflict` |
 
 ## Banco de dados
 
@@ -314,6 +350,38 @@ Content-Type: application/json
 - outro Employee tentando editar: `404 Not Found`;
 - edição de reembolso fora de `Draft`: `409 Conflict`.
 
+## Validar I05
+
+```http
+POST /api/expenses/{id}/submit
+Authorization: Bearer <EmployeeToken>
+```
+
+```http
+GET /api/expenses
+Authorization: Bearer <Token>
+```
+
+```http
+GET /api/expenses/{id}
+Authorization: Bearer <Token>
+```
+
+### Casos validados
+
+- proprietário envia `Draft`: `200 OK` e estado `Submitted`;
+- repetir o envio: `409 Conflict`, sem novo histórico;
+- outro Employee tentando enviar: `404 Not Found`;
+- Approver ou Auditor tentando enviar: `403 Forbidden`;
+- Employee lista somente os próprios reembolsos;
+- Approver lista somente `Submitted`;
+- Finance lista somente `Approved` e `Paid`;
+- Auditor lista todos;
+- Employee + Approver lista os próprios e os `Submitted`;
+- Admin sem outra role: `403 Forbidden`;
+- detalhe fora do escopo: `404 Not Found`;
+- rota protegida sem token: `401 Unauthorized`.
+
 ## Qualidade e segurança
 
 O projeto não deve versionar:
@@ -383,6 +451,14 @@ referência: Racass/checkpoint-csharpracass-expensehub#3
 branch: i04-expense-draft
 PR: I04 — Criar e editar rascunho
 referência: Racass/checkpoint-csharpracass-expensehub#4
+```
+
+### I05
+
+```text
+branch: i05-submit-query
+PR: I05 — Enviar, listar e consultar
+referência: Racass/checkpoint-csharpracass-expensehub#5
 ```
 
 Não use `Closes`, `Fixes` ou `Resolves` nas referências ao backlog central.

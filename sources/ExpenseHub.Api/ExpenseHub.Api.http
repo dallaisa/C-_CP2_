@@ -177,3 +177,79 @@ Content-Type: application/json
 	"expenseDate": "2026-09-30",
 	"categoryId": 1
 }
+
+###
+
+# I05 — Tokens for each profile. Log in again after an Admin changes roles.
+@approverAccessToken = REPLACE_WITH_APPROVER_ACCESS_TOKEN
+@financeAccessToken = REPLACE_WITH_FINANCE_ACCESS_TOKEN
+@auditorAccessToken = REPLACE_WITH_AUDITOR_ACCESS_TOKEN
+
+# The owner submits a draft: 200 and status Submitted. There is no request body.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}/submit
+Authorization: Bearer {{employeeAccessToken}}
+
+###
+
+# Submitting again returns 409 and records no new history entry.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}/submit
+Authorization: Bearer {{employeeAccessToken}}
+
+###
+
+# Another Employee cannot submit it: 404.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}/submit
+Authorization: Bearer {{otherEmployeeAccessToken}}
+
+###
+
+# An Approver or Auditor cannot submit: 403.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}/submit
+Authorization: Bearer {{auditorAccessToken}}
+
+###
+
+# Employee: only their own expenses.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{employeeAccessToken}}
+
+###
+
+# Approver: only Submitted expenses.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{approverAccessToken}}
+
+###
+
+# Finance: only Approved and Paid expenses.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{financeAccessToken}}
+
+###
+
+# Auditor: all expenses.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{auditorAccessToken}}
+
+###
+
+# Admin without a functional role: 403.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{adminAccessToken}}
+
+###
+
+# Anonymous request: 401.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses
+
+###
+
+# Detail visible to the viewer: 200.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
+Authorization: Bearer {{employeeAccessToken}}
+
+###
+
+# Detail outside the viewer's scope (another Employee, or Finance on a Submitted expense): 404.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
+Authorization: Bearer {{otherEmployeeAccessToken}}

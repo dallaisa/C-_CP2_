@@ -14,6 +14,9 @@ internal sealed class ExpenseOperationResult
     /// <summary>Gets the affected expense when the operation succeeded.</summary>
     public Expense? Expense { get; init; }
 
+    /// <summary>Gets a human readable explanation of a conflict.</summary>
+    public string? Message { get; init; }
+
     /// <summary>Gets the validation errors when the input is invalid.</summary>
     public IDictionary<string, string[]> Errors { get; init; } = new Dictionary<string, string[]>();
 
@@ -35,7 +38,8 @@ internal sealed class ExpenseOperationResult
         new ExpenseOperationResult { Status = ExpenseOperationStatus.NotFound };
 
     /// <summary>Creates a state conflict result.</summary>
+    /// <param name="message">The explanation of the conflict.</param>
     /// <returns>A conflict result.</returns>
-    internal static ExpenseOperationResult Conflict() =>
-        new ExpenseOperationResult { Status = ExpenseOperationStatus.Conflict };
+    internal static ExpenseOperationResult Conflict(string message) =>
+        new ExpenseOperationResult { Status = ExpenseOperationStatus.Conflict, Message = message };
 }
