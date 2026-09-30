@@ -13,4 +13,10 @@ internal static class ExpenseHistoryActions
 
     /// <summary>Gets the action recorded when a draft is submitted for approval.</summary>
     internal const string Submitted = "Submitted";
+
+    /// <summary>Gets the action recorded when a submitted expense is approved.</summary>
+    internal const string Approved = "Approved";
+
+    /// <summary>Gets the action recorded when a submitted expense is rejected.</summary>
+    internal const string Rejected = "Rejected";
 }

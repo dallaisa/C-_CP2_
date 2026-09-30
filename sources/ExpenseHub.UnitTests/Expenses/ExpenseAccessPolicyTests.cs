@@ -94,25 +94,23 @@ public sealed class ExpenseAccessPolicyTests
         Assert.AreEqual(ExpenseAccessDecision.Forbidden, decision);
     }
 
-    /// <summary>A draft outside the Approver's scope, or a missing expense, is reported as missing.</summary>
+    /// <summary>A decision on a missing expense is reported as missing.</summary>
     [TestMethod]
-    public void ApproverDoesNotSeeOtherUsersDrafts()
+    public void ApprovalDecisionOnMissingExpenseIsNotFound()
     {
-        Assert.AreEqual(
-            ExpenseAccessDecision.NotFound,
-            ExpenseAccessPolicy.EvaluateApprovalDecision(Approver(), CreateExpense(OtherId, ExpenseStatus.Draft)));
         Assert.AreEqual(
             ExpenseAccessDecision.NotFound,
             ExpenseAccessPolicy.EvaluateApprovalDecision(Approver(), null));
     }
 
-    /// <summary>A decision on an expense that already left the approval queue is a conflict.</summary>
+    /// <summary>A decision on an expense that is not Submitted is a conflict.</summary>
     /// <param name="status">The numeric value of the current status.</param>
     [TestMethod]
+    [DataRow((int)ExpenseStatus.Draft)]
     [DataRow((int)ExpenseStatus.Approved)]
     [DataRow((int)ExpenseStatus.Rejected)]
     [DataRow((int)ExpenseStatus.Paid)]
-    public void RepeatedApprovalDecisionIsConflict(int status)
+    public void ApprovalDecisionOutsideSubmittedIsConflict(int status)
     {
         ExpenseAccessDecision decision = ExpenseAccessPolicy.EvaluateApprovalDecision(
             Approver(),

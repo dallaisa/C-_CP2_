@@ -308,3 +308,53 @@ Authorization: Bearer {{otherEmployeeAccessToken}}
 # Finance cannot read a Submitted expense: 404.
 GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
 Authorization: Bearer {{financeAccessToken}}
+
+###
+
+# I07 — Set @submittedExpenseId to a Submitted expense owned by another user.
+@submittedExpenseId = REPLACE_WITH_SUBMITTED_EXPENSE_ID
+@ownSubmittedExpenseId = REPLACE_WITH_APPROVER_OWN_SUBMITTED_EXPENSE_ID
+
+# An Approver approves another user's Submitted expense: 200. There is no request body.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{submittedExpenseId}}/approve
+Authorization: Bearer {{approverAccessToken}}
+
+###
+
+# Approving again returns 409 and records no new history entry.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{submittedExpenseId}}/approve
+Authorization: Bearer {{approverAccessToken}}
+
+###
+
+# An Approver rejects a Submitted expense with a justification: 200.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{submittedExpenseId}}/reject
+Authorization: Bearer {{approverAccessToken}}
+Content-Type: application/json
+
+{
+	"reason": "Comprovante ilegível, reenviar"
+}
+
+###
+
+# A justification shorter than 10 characters returns 400.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{submittedExpenseId}}/reject
+Authorization: Bearer {{approverAccessToken}}
+Content-Type: application/json
+
+{
+	"reason": "curta"
+}
+
+###
+
+# The owner cannot decide on their own expense, even with Employee and Approver roles: 403.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{ownSubmittedExpenseId}}/approve
+Authorization: Bearer {{approverAccessToken}}
+
+###
+
+# Users without the Approver role cannot decide: 403.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{submittedExpenseId}}/approve
+Authorization: Bearer {{employeeAccessToken}}

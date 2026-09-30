@@ -41,6 +41,12 @@ internal static class ExpenseEndpoints
         endpoints.MapPost("/api/expenses/{id:guid}/submit", SubmitAsync)
             .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Employee));
 
+        endpoints.MapPost("/api/expenses/{id:guid}/approve", ApproveAsync)
+            .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Approver));
+
+        endpoints.MapPost("/api/expenses/{id:guid}/reject", RejectAsync)
+            .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Approver));
+
         // Admin is intentionally absent: it grants no functional access to expenses.
         endpoints.MapGet("/api/expenses", ListAsync)
             .RequireAuthorization(policy => policy.RequireRole(ReaderRoles));
@@ -123,6 +129,43 @@ internal static class ExpenseEndpoints
         return ToProblem(result);
     }
 
+    private static async Task<IResult> ApproveAsync(
+        Guid id,
+        ClaimsPrincipal principal,
+        ExpenseService expenseService,
+        CancellationToken cancellationToken)
+    {
+        ExpenseViewer? actor = CreateViewer(principal);
+        if (actor is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        ExpenseOperationResult result =
+            await expenseService.ApproveAsync(id, actor, cancellationToken);
+
+        return ToResponse(result);
+    }
+
+    private static async Task<IResult> RejectAsync(
+        Guid id,
+        RejectExpenseRequest request,
+        ClaimsPrincipal principal,
+        ExpenseService expenseService,
+        CancellationToken cancellationToken)
+    {
+        ExpenseViewer? actor = CreateViewer(principal);
+        if (actor is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        ExpenseOperationResult result =
+            await expenseService.RejectAsync(id, actor, request, cancellationToken);
+
+        return ToResponse(result);
+    }
+
     private static async Task<IResult> ListAsync(
         ClaimsPrincipal principal,
         ExpenseService expenseService,
@@ -174,6 +217,11 @@ internal static class ExpenseEndpoints
             IsAuditor = principal.IsInRole(ApplicationRoles.Auditor),
         };
     }
+
+    private static IResult ToResponse(ExpenseOperationResult result) =>
+        result.Status == ExpenseOperationStatus.Success && result.Expense is not null
+            ? Results.Ok(ExpenseResponse.FromExpense(result.Expense))
+            : ToProblem(result);
 
     private static IResult ToProblem(ExpenseOperationResult result) =>
         result.Status switch
