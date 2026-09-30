@@ -6,6 +6,7 @@ using ExpenseHub.Api.Endpoints;
 using ExpenseHub.Api.Expenses;
 using ExpenseHub.Api.Identity;
 using ExpenseHub.Api.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -56,7 +57,13 @@ internal static class Program
             })
             .AddBearerToken(IdentityConstants.BearerScheme);
 
-        builder.Services.AddAuthorization();
+        // Secure by default: any endpoint without an explicit rule requires an authenticated user.
+        builder.Services.AddAuthorization(options =>
+        {
+            options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build();
+        });
 
         WebApplication app = builder.Build();
 
@@ -64,14 +71,15 @@ internal static class Program
 
         if (app.Environment.IsDevelopment())
         {
-            app.MapOpenApi();
+            app.MapOpenApi().AllowAnonymous();
         }
 
         app.UseAuthentication();
         app.UseAuthorization();
 
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
-            .WithName("GetHealth");
+            .WithName("GetHealth")
+            .AllowAnonymous();
 
         app.MapAuthEndpoints();
         app.MapUserEndpoints();

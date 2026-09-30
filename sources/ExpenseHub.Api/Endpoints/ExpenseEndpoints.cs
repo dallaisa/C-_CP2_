@@ -57,14 +57,14 @@ internal static class ExpenseEndpoints
         ExpenseService expenseService,
         CancellationToken cancellationToken)
     {
-        string? ownerId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(ownerId))
+        ExpenseViewer? actor = CreateViewer(principal);
+        if (actor is null)
         {
             return Results.Unauthorized();
         }
 
         ExpenseOperationResult result =
-            await expenseService.CreateDraftAsync(ownerId, request, cancellationToken);
+            await expenseService.CreateDraftAsync(actor, request, cancellationToken);
 
         if (result.Status == ExpenseOperationStatus.Success && result.Expense is not null)
         {
@@ -83,14 +83,14 @@ internal static class ExpenseEndpoints
         ExpenseService expenseService,
         CancellationToken cancellationToken)
     {
-        string? actorId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(actorId))
+        ExpenseViewer? actor = CreateViewer(principal);
+        if (actor is null)
         {
             return Results.Unauthorized();
         }
 
         ExpenseOperationResult result =
-            await expenseService.UpdateDraftAsync(id, actorId, request, cancellationToken);
+            await expenseService.UpdateDraftAsync(id, actor, request, cancellationToken);
 
         if (result.Status == ExpenseOperationStatus.Success && result.Expense is not null)
         {
@@ -106,14 +106,14 @@ internal static class ExpenseEndpoints
         ExpenseService expenseService,
         CancellationToken cancellationToken)
     {
-        string? actorId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(actorId))
+        ExpenseViewer? actor = CreateViewer(principal);
+        if (actor is null)
         {
             return Results.Unauthorized();
         }
 
         ExpenseOperationResult result =
-            await expenseService.SubmitAsync(id, actorId, cancellationToken);
+            await expenseService.SubmitAsync(id, actor, cancellationToken);
 
         if (result.Status == ExpenseOperationStatus.Success && result.Expense is not null)
         {
@@ -182,6 +182,9 @@ internal static class ExpenseEndpoints
             ExpenseOperationStatus.NotFound => Results.Problem(
                 statusCode: StatusCodes.Status404NotFound,
                 title: "Expense not found."),
+            ExpenseOperationStatus.Forbidden => Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "The operation is not allowed for the current user."),
             ExpenseOperationStatus.Conflict => Results.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: result.Message ?? "The expense state does not allow this operation."),

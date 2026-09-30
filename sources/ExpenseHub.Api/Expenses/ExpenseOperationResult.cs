@@ -37,6 +37,11 @@ internal sealed class ExpenseOperationResult
     internal static ExpenseOperationResult NotFound() =>
         new ExpenseOperationResult { Status = ExpenseOperationStatus.NotFound };
 
+    /// <summary>Creates a forbidden result.</summary>
+    /// <returns>A forbidden result.</returns>
+    internal static ExpenseOperationResult Forbidden() =>
+        new ExpenseOperationResult { Status = ExpenseOperationStatus.Forbidden };
+
     /// <summary>Creates a state conflict result.</summary>
     /// <param name="message">The explanation of the conflict.</param>
     /// <returns>A conflict result.</returns>

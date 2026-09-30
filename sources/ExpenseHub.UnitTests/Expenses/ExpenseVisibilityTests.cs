@@ -77,6 +77,20 @@ public sealed class ExpenseVisibilityTests
             expense => expense.OwnerId == ViewerId || expense.Status == ExpenseStatus.Submitted));
     }
 
+    /// <summary>Employee and Finance see their own expenses plus approved and paid ones.</summary>
+    [TestMethod]
+    public void EmployeeAndFinanceSeeUnionOfPermissions()
+    {
+        List<Expense> visible = Filter(
+            new ExpenseViewer { UserId = ViewerId, IsEmployee = true, IsFinance = true });
+
+        // Five own expenses plus the other owner's approved and paid expenses.
+        Assert.HasCount(7, visible);
+        Assert.IsTrue(visible.All(
+            expense => expense.OwnerId == ViewerId
+                || expense.Status is ExpenseStatus.Approved or ExpenseStatus.Paid));
+    }
+
     /// <summary>An Employee cannot see another Employee's expense in any state.</summary>
     [TestMethod]
     public void EmployeeDoesNotSeeOtherOwnersExpenses()

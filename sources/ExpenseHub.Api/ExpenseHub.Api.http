@@ -253,3 +253,58 @@ Authorization: Bearer {{employeeAccessToken}}
 # Detail outside the viewer's scope (another Employee, or Finance on a Submitted expense): 404.
 GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
 Authorization: Bearer {{otherEmployeeAccessToken}}
+
+###
+
+# I06 — Access matrix negative cases.
+@noRoleAccessToken = REPLACE_WITH_NO_ROLE_ACCESS_TOKEN
+
+# Invalid token: 401.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer invalid-token
+
+###
+
+# Authenticated user without roles: 403.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{noRoleAccessToken}}
+
+###
+
+# Admin has no functional access to expenses: 403.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+	"description": "Admin tentando criar reembolso",
+	"amount": 10,
+	"expenseDate": "2026-09-30",
+	"categoryId": 1
+}
+
+###
+
+# Auditor reads everything but cannot write: 403.
+PUT {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
+Authorization: Bearer {{auditorAccessToken}}
+Content-Type: application/json
+
+{
+	"description": "Auditor tentando editar",
+	"amount": 10,
+	"expenseDate": "2026-09-30",
+	"categoryId": 1
+}
+
+###
+
+# Changing the id in the URL does not expose another Employee's expense: 404.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
+Authorization: Bearer {{otherEmployeeAccessToken}}
+
+###
+
+# Finance cannot read a Submitted expense: 404.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
+Authorization: Bearer {{financeAccessToken}}

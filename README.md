@@ -1,4 +1,4 @@
-# ExpenseHub — I01 a I05
+# ExpenseHub — I01 a I06
 
 Versão preparada para concluir:
 
@@ -7,6 +7,7 @@ Versão preparada para concluir:
 - **I03 — Cadastro HTTP e gerenciamento de roles**
 - **I04 — Criar e editar rascunho**
 - **I05 — Enviar, listar e consultar**
+- **I06 — Ownership e matriz de acesso**
 
 ## I01 implementada
 
@@ -130,6 +131,58 @@ As categorias são criadas de forma idempotente na inicialização:
 | Consulta sem `Employee`, `Approver`, `Finance` ou `Auditor` | `403 Forbidden` |
 | Reembolso inexistente, de outro Employee ou fora do escopo | `404 Not Found` |
 | Envio repetido ou fora de `Draft` | `409 Conflict` |
+
+## I06 implementada
+
+A autorização combina três camadas:
+
+1. **Autenticação**: política padrão (`FallbackPolicy`) exige usuário autenticado em qualquer rota sem regra explícita;
+   somente `/health`, `/login`, `/register` e o OpenAPI (apenas em Development) são públicos.
+2. **Role na rota**: cada endpoint exige as roles que podem usá-lo (`403` quando o usuário não tem nenhuma delas).
+3. **Regra contextual no serviço** (`ExpenseAccessPolicy` e `ExpenseVisibility`): ownership, estado e visibilidade
+   decidem se aquele usuário pode agir sobre aquele reembolso.
+
+Detalhes:
+
+- o serviço recebe a identidade completa (`ExpenseViewer`) e revalida a role funcional, além do atributo da rota;
+- criação, edição e envio usam `ExpenseAccessPolicy.EvaluateDraftChange` (Employee, proprietário e `Draft`);
+- a busca por reembolso próprio filtra `Id` e `OwnerId` no SQL;
+- leitura e listagem usam `ExpenseVisibility`, traduzida para o `WHERE` antes da materialização;
+- `ExpenseAccessPolicy.EvaluateApprovalDecision` e `EvaluatePayment` implementam as proibições de
+  autoaprovação e autopagamento, inclusive com roles acumuladas; os endpoints de aprovar, reprovar e pagar
+  pertencem às I07 e I08 e devem usar essas regras;
+- Admin não recebe acesso funcional aos reembolsos.
+
+### Matriz aplicada
+
+| Operação | Employee | Approver | Finance | Auditor | Admin | Regra contextual (serviço) | Implementada em |
+|---|:---:|:---:|:---:|:---:|:---:|---|---|
+| Registrar | público | público | público | público | público | Cadastro nunca aceita role | I03 |
+| Login | público | público | público | público | público | Credenciais válidas | I02 |
+| Listar usuários | não | não | não | não | sim | Somente Admin | I03 |
+| Alterar roles | não | não | não | não | sim | Roles conhecidas; não remover a própria role Admin | I03 |
+| Criar reembolso | sim | não* | não* | não | não* | Proprietário vem do token | I04 |
+| Editar reembolso | sim | não* | não* | não | não* | Proprietário e `Draft`; outro dono → `404`; fora de `Draft` → `409` | I04/I06 |
+| Enviar reembolso | sim | não* | não* | não | não* | Proprietário e `Draft`; outro dono → `404`; fora de `Draft` → `409` | I05/I06 |
+| Listar reembolsos | próprios | `Submitted` | `Approved`/`Paid` | todos | não | Filtro no SQL; roles somam | I05 |
+| Consultar detalhe | próprio | `Submitted` | `Approved`/`Paid` | todos | não | Fora do escopo → `404` | I05 |
+| Aprovar/Reprovar | não | sim | não | não | não | Não proprietário → senão `403`; `Submitted` → senão `409` | Regra: I06 · Rota: I07 |
+| Pagar | não | não | sim | não | não | Não proprietário → senão `403`; `Approved` → senão `409` | Regra: I06 · Rota: I08 |
+| Consultar histórico | próprio | visível | visível | todos | não | Mesma visibilidade do reembolso | I08 |
+
+`*` A permissão existe apenas se o usuário também possuir `Employee`.
+
+### Decisões de resposta
+
+| Situação | Status |
+|---|---|
+| Sem token ou token inválido | `401` |
+| Autenticado sem a role da rota | `403` |
+| Approver/Finance agindo sobre reembolso próprio | `403` (o reembolso é visível, mas a operação é proibida) |
+| Reembolso inexistente, de outro Employee ou fora do escopo | `404` |
+| Transição fora do estado esperado | `409` |
+| Aprovar/reprovar reembolso que já saiu da fila (`Approved`, `Rejected`, `Paid`) | `409` |
+| Pagar reembolso ainda não aprovado (`Draft`, `Submitted`, `Rejected`) | `404` (fora do escopo do Finance) |
 
 ## Banco de dados
 
@@ -382,6 +435,25 @@ Authorization: Bearer <Token>
 - detalhe fora do escopo: `404 Not Found`;
 - rota protegida sem token: `401 Unauthorized`.
 
+## Validar I06
+
+Crie usuários com as roles `Employee`, `Approver`, `Finance`, `Auditor`, `Employee`+`Approver`,
+`Employee`+`Finance` e um usuário sem role, além do Admin do seed. Faça login novamente após atribuir roles.
+
+### Casos negativos validados
+
+- requisição anônima ou com token inválido em rota protegida: `401`;
+- usuário autenticado sem role: `403` em todas as rotas de reembolso e de administração;
+- trocar o identificador na URL não expõe reembolso de outro Employee (`404` em detalhe, edição e envio);
+- listagem de um Employee não inclui reembolsos de outros;
+- `ownerId`, `status`, `id`, ator e horário enviados pelo cliente são ignorados;
+- Auditor lê tudo, mas recebe `403` ao criar, editar, enviar ou alterar roles;
+- Admin recebe `403` em todas as rotas de reembolso e continua administrando usuários;
+- envio repetido, envio de `Approved`/`Paid` e edição de `Submitted`: `409`;
+- Approver lendo `Draft`/`Approved` e Finance lendo `Draft`/`Submitted`: `404`;
+- roles acumuladas recebem a união das permissões de leitura;
+- autoaprovação e autopagamento: `403`, cobertos por testes unitários até que as rotas das I07/I08 existam.
+
 ## Qualidade e segurança
 
 O projeto não deve versionar:
@@ -459,6 +531,14 @@ referência: Racass/checkpoint-csharpracass-expensehub#4
 branch: i05-submit-query
 PR: I05 — Enviar, listar e consultar
 referência: Racass/checkpoint-csharpracass-expensehub#5
+```
+
+### I06
+
+```text
+branch: i06-ownership-access
+PR: I06 — Ownership e matriz de acesso
+referência: Racass/checkpoint-csharpracass-expensehub#6
 ```
 
 Não use `Closes`, `Fixes` ou `Resolves` nas referências ao backlog central.
