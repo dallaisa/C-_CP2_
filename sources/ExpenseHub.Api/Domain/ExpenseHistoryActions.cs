@@ -10,4 +10,7 @@ internal static class ExpenseHistoryActions
 
     /// <summary>Gets the action recorded when a draft is edited.</summary>
     internal const string Updated = "Updated";
+
+    /// <summary>Gets the action recorded when a draft is submitted for approval.</summary>
+    internal const string Submitted = "Submitted";
 }

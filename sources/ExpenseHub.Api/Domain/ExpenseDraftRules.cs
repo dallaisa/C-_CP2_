@@ -6,7 +6,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 
 /// <summary>
-/// Applies the creation and edition rules of draft expenses.
+/// Applies the creation, edition and submission rules of draft expenses.
 /// </summary>
 internal static class ExpenseDraftRules
 {
@@ -120,6 +120,40 @@ internal static class ExpenseDraftRules
         });
 
         return DraftEditOutcome.Updated;
+    }
+
+    /// <summary>Submits a draft expense when the actor owns it and it is still a draft.</summary>
+    /// <param name="expense">The expense to submit.</param>
+    /// <param name="actorId">The identifier of the authenticated actor.</param>
+    /// <param name="nowUtc">The current server time in UTC.</param>
+    /// <returns>The outcome of the submission attempt.</returns>
+    internal static DraftSubmitOutcome Submit(Expense expense, string actorId, DateTimeOffset nowUtc)
+    {
+        ArgumentNullException.ThrowIfNull(expense);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actorId);
+
+        if (!string.Equals(expense.OwnerId, actorId, StringComparison.Ordinal))
+        {
+            return DraftSubmitOutcome.NotOwner;
+        }
+
+        if (expense.Status != ExpenseStatus.Draft)
+        {
+            return DraftSubmitOutcome.NotDraft;
+        }
+
+        expense.Status = ExpenseStatus.Submitted;
+        expense.History.Add(new ExpenseHistory
+        {
+            ExpenseId = expense.Id,
+            Action = ExpenseHistoryActions.Submitted,
+            ActorId = actorId,
+            OccurredAtUtc = nowUtc.ToUniversalTime(),
+            PreviousStatus = ExpenseStatus.Draft,
+            NewStatus = ExpenseStatus.Submitted,
+        });
+
+        return DraftSubmitOutcome.Submitted;
     }
 
     private sealed class FieldChange

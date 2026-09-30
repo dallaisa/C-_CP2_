@@ -70,9 +70,11 @@ internal sealed class ExpenseHubDbContext : IdentityDbContext<AppUser>
         builder.Property(expense => expense.Amount)
             .HasPrecision(18, 2);
 
+        // The status is checked on every update, so two concurrent transitions cannot both succeed.
         builder.Property(expense => expense.Status)
             .HasConversion<string>()
-            .HasMaxLength(32);
+            .HasMaxLength(32)
+            .IsConcurrencyToken();
 
         builder.HasOne(expense => expense.Category)
             .WithMany(category => category.Expenses)
