@@ -48,7 +48,7 @@ internal static class UserEndpoints
         RegisterRequest request,
         UserManager<AppUser> userManager)
     {
-        Dictionary<string, string[]> validationErrors = Validate(request);
+        Dictionary<string, string[]> validationErrors = RequestValidation.Validate(request);
         if (validationErrors.Count > 0)
         {
             return Results.ValidationProblem(validationErrors);
@@ -106,7 +106,7 @@ internal static class UserEndpoints
         UserManager<AppUser> userManager,
         RoleManager<IdentityRole> roleManager)
     {
-        Dictionary<string, string[]> validationErrors = Validate(request);
+        Dictionary<string, string[]> validationErrors = RequestValidation.Validate(request);
         if (validationErrors.Count > 0)
         {
             return Results.ValidationProblem(validationErrors);
@@ -191,30 +191,6 @@ internal static class UserEndpoints
 
         IList<string> updatedRoles = await userManager.GetRolesAsync(user);
         return Results.Ok(new UserResponse(user.Id, user.Email, updatedRoles));
-    }
-
-    private static Dictionary<string, string[]> Validate(object model)
-    {
-        List<ValidationResult> results = new ();
-        bool isValid = Validator.TryValidateObject(
-            model,
-            new ValidationContext(model),
-            results,
-            validateAllProperties: true);
-
-        if (isValid)
-        {
-            return new Dictionary<string, string[]>();
-        }
-
-        return results
-            .SelectMany(
-                result => result.MemberNames.DefaultIfEmpty(string.Empty),
-                (result, member) => new { Member = member, Error = result.ErrorMessage ?? "Invalid value." })
-            .GroupBy(item => item.Member)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(item => item.Error).ToArray());
     }
 
     private static Dictionary<string, string[]> ToErrorDictionary(IEnumerable<IdentityError> errors)

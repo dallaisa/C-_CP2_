@@ -1,0 +1,13 @@
+namespace ExpenseHub.Api.Domain;
+
+/// <summary>
+/// Contains the action names recorded in the expense history.
+/// </summary>
+internal static class ExpenseHistoryActions
+{
+    /// <summary>Gets the action recorded when a draft is created.</summary>
+    internal const string Created = "Created";
+
+    /// <summary>Gets the action recorded when a draft is edited.</summary>
+    internal const string Updated = "Updated";
+}
