@@ -1,4 +1,4 @@
-# ExpenseHub — I01 a I06
+# ExpenseHub — I01 a I07
 
 Versão preparada para concluir:
 
@@ -8,6 +8,7 @@ Versão preparada para concluir:
 - **I04 — Criar e editar rascunho**
 - **I05 — Enviar, listar e consultar**
 - **I06 — Ownership e matriz de acesso**
+- **I07 — Aprovar e reprovar com justificativa**
 
 ## I01 implementada
 
@@ -149,8 +150,8 @@ Detalhes:
 - a busca por reembolso próprio filtra `Id` e `OwnerId` no SQL;
 - leitura e listagem usam `ExpenseVisibility`, traduzida para o `WHERE` antes da materialização;
 - `ExpenseAccessPolicy.EvaluateApprovalDecision` e `EvaluatePayment` implementam as proibições de
-  autoaprovação e autopagamento, inclusive com roles acumuladas; os endpoints de aprovar, reprovar e pagar
-  pertencem às I07 e I08 e devem usar essas regras;
+  autoaprovação e autopagamento, inclusive com roles acumuladas; aprovar e reprovar usam essas regras desde a I07,
+  e o endpoint de pagar pertence à I08;
 - Admin não recebe acesso funcional aos reembolsos.
 
 ### Matriz aplicada
@@ -166,7 +167,7 @@ Detalhes:
 | Enviar reembolso | sim | não* | não* | não | não* | Proprietário e `Draft`; outro dono → `404`; fora de `Draft` → `409` | I05/I06 |
 | Listar reembolsos | próprios | `Submitted` | `Approved`/`Paid` | todos | não | Filtro no SQL; roles somam | I05 |
 | Consultar detalhe | próprio | `Submitted` | `Approved`/`Paid` | todos | não | Fora do escopo → `404` | I05 |
-| Aprovar/Reprovar | não | sim | não | não | não | Não proprietário → senão `403`; `Submitted` → senão `409` | Regra: I06 · Rota: I07 |
+| Aprovar/Reprovar | não | sim | não | não | não | Não proprietário → senão `403`; `Submitted` → senão `409` | I06/I07 |
 | Pagar | não | não | sim | não | não | Não proprietário → senão `403`; `Approved` → senão `409` | Regra: I06 · Rota: I08 |
 | Consultar histórico | próprio | visível | visível | todos | não | Mesma visibilidade do reembolso | I08 |
 
@@ -181,8 +182,35 @@ Detalhes:
 | Approver/Finance agindo sobre reembolso próprio | `403` (o reembolso é visível, mas a operação é proibida) |
 | Reembolso inexistente, de outro Employee ou fora do escopo | `404` |
 | Transição fora do estado esperado | `409` |
-| Aprovar/reprovar reembolso que já saiu da fila (`Approved`, `Rejected`, `Paid`) | `409` |
+| Aprovar/reprovar reembolso fora de `Submitted` (`Draft`, `Approved`, `Rejected`, `Paid`) | `409` |
 | Pagar reembolso ainda não aprovado (`Draft`, `Submitted`, `Rejected`) | `404` (fora do escopo do Finance) |
+
+## I07 implementada
+
+- `POST /api/expenses/{id}/approve` executa `Submitted → Approved`, restrito à role `Approver`; não recebe corpo;
+- `POST /api/expenses/{id}/reject` executa `Submitted → Rejected`, restrito à role `Approver`;
+- a reprovação recebe apenas o DTO `RejectExpenseRequest` (`reason`), obrigatório e entre 10 e 500 caracteres
+  (espaços nas pontas não contam);
+- somente um Approver **não proprietário** decide; o proprietário recebe `403` mesmo acumulando `Employee` e `Approver`;
+- ator, horário e estados são definidos pelo servidor; campos extras no corpo são ignorados;
+- `Rejected` é final: não há reabertura, cancelamento, reenvio ou nova decisão;
+- histórico `Approved`/`Rejected` com reembolso, ator do token, instante UTC do servidor, estado anterior,
+  estado posterior e justificativa (na reprovação), gravado na mesma chamada de `SaveChanges` da transição;
+- decisão repetida ou fora de `Submitted` retorna `409` sem gravar histórico;
+- o `Status` é token de concorrência: duas decisões simultâneas sobre o mesmo reembolso resultam em uma
+  aplicada e outra `409`, com um único registro no histórico.
+
+### Respostas da I07
+
+| Situação | Status |
+|---|---|
+| Decisão válida | `200 OK` |
+| Justificativa ausente, vazia, curta ou longa | `400 Bad Request` |
+| Sem token | `401 Unauthorized` |
+| Sem role `Approver` (Employee, Finance, Auditor, Admin, sem role) | `403 Forbidden` |
+| Approver decidindo sobre reembolso próprio | `403 Forbidden` |
+| Reembolso inexistente | `404 Not Found` |
+| Reembolso fora de `Submitted` ou decisão repetida | `409 Conflict` |
 
 ## Banco de dados
 
@@ -452,7 +480,39 @@ Crie usuários com as roles `Employee`, `Approver`, `Finance`, `Auditor`, `Emplo
 - envio repetido, envio de `Approved`/`Paid` e edição de `Submitted`: `409`;
 - Approver lendo `Draft`/`Approved` e Finance lendo `Draft`/`Submitted`: `404`;
 - roles acumuladas recebem a união das permissões de leitura;
-- autoaprovação e autopagamento: `403`, cobertos por testes unitários até que as rotas das I07/I08 existam.
+- autoaprovação: `403` (validada por HTTP a partir da I07); autopagamento: `403`, coberto por testes unitários até a rota da I08.
+
+## Validar I07
+
+```http
+POST /api/expenses/{id}/approve
+Authorization: Bearer <ApproverToken>
+```
+
+```http
+POST /api/expenses/{id}/reject
+Authorization: Bearer <ApproverToken>
+Content-Type: application/json
+```
+
+```json
+{
+  "reason": "Comprovante ilegível, reenviar"
+}
+```
+
+### Casos validados
+
+- Approver aprova `Submitted`: `200` e estado `Approved`;
+- Approver reprova `Submitted` com justificativa válida: `200` e estado `Rejected`, justificativa no histórico;
+- reprovação sem corpo, sem justificativa, vazia, curta, longa ou só com espaços: `400`;
+- Approver (com ou sem `Employee`) aprovando ou reprovando reembolso próprio: `403`;
+- Employee, Finance, Auditor, Admin e usuário sem role: `403`;
+- aprovar ou reprovar `Draft`: `409`;
+- repetir aprovação ou reprovação, ou decidir sobre `Approved`/`Rejected`: `409`;
+- reenviar ou editar `Rejected`: `409`;
+- reembolso inexistente: `404`;
+- histórico com um único registro por decisão, inclusive com duas aprovações simultâneas.
 
 ## Qualidade e segurança
 
@@ -539,6 +599,14 @@ referência: Racass/checkpoint-csharpracass-expensehub#5
 branch: i06-ownership-access
 PR: I06 — Ownership e matriz de acesso
 referência: Racass/checkpoint-csharpracass-expensehub#6
+```
+
+### I07
+
+```text
+branch: i07-approve-reject
+PR: I07 — Aprovar e reprovar com justificativa
+referência: Racass/checkpoint-csharpracass-expensehub#7
 ```
 
 Não use `Closes`, `Fixes` ou `Resolves` nas referências ao backlog central.

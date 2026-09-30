@@ -20,6 +20,10 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
 
     private const string SubmitConflictMessage = "Only expenses in Draft can be submitted.";
 
+    private const string ApproveConflictMessage = "Only expenses in Submitted can be approved.";
+
+    private const string RejectConflictMessage = "Only expenses in Submitted can be rejected.";
+
     private static readonly string[] InvalidCategoryErrors = new[] { "CategoryId must be a valid category." };
 
     /// <summary>Creates a draft expense owned by the authenticated user.</summary>
@@ -166,6 +170,60 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
         return ExpenseOperationResult.Success(expense!);
     }
 
+    /// <summary>Approves a submitted expense owned by another user.</summary>
+    /// <param name="expenseId">The identifier of the expense to approve.</param>
+    /// <param name="actor">The authenticated Approver.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The operation result.</returns>
+    internal Task<ExpenseOperationResult> ApproveAsync(
+        Guid expenseId,
+        ExpenseViewer actor,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        return DecideAsync(
+            dbContext,
+            timeProvider.GetUtcNow(),
+            expenseId,
+            actor,
+            ApproveConflictMessage,
+            (expense, nowUtc) => ExpenseDecisionRules.Approve(expense, actor.UserId, nowUtc),
+            cancellationToken);
+    }
+
+    /// <summary>Rejects a submitted expense owned by another user.</summary>
+    /// <param name="expenseId">The identifier of the expense to reject.</param>
+    /// <param name="actor">The authenticated Approver.</param>
+    /// <param name="request">The rejection justification sent by the client.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The operation result.</returns>
+    internal async Task<ExpenseOperationResult> RejectAsync(
+        Guid expenseId,
+        ExpenseViewer actor,
+        RejectExpenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        ArgumentNullException.ThrowIfNull(request);
+
+        Dictionary<string, string[]> errors = RejectExpenseRequestValidator.Validate(request);
+        if (errors.Count > 0)
+        {
+            return ExpenseOperationResult.Invalid(errors);
+        }
+
+        string reason = request.Reason!.Trim();
+        return await DecideAsync(
+            dbContext,
+            timeProvider.GetUtcNow(),
+            expenseId,
+            actor,
+            RejectConflictMessage,
+            (expense, nowUtc) => ExpenseDecisionRules.Reject(expense, actor.UserId, reason, nowUtc),
+            cancellationToken);
+    }
+
     /// <summary>Lists the expenses visible to the authenticated user.</summary>
     /// <param name="viewer">The authenticated viewer.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
@@ -209,6 +267,47 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
         {
             [nameof(ExpenseRequest.CategoryId)] = InvalidCategoryErrors,
         });
+
+    private static async Task<ExpenseOperationResult> DecideAsync(
+        ExpenseHubDbContext context,
+        DateTimeOffset nowUtc,
+        Guid expenseId,
+        ExpenseViewer actor,
+        string conflictMessage,
+        Func<Expense, DateTimeOffset, ExpenseDecisionOutcome> decide,
+        CancellationToken cancellationToken)
+    {
+        Expense? expense = await context.Expenses
+            .Include(item => item.Category)
+            .FirstOrDefaultAsync(item => item.Id == expenseId, cancellationToken);
+
+        // Role, ownership and state are checked before anything changes.
+        ExpenseAccessDecision decision = ExpenseAccessPolicy.EvaluateApprovalDecision(actor, expense);
+        if (decision != ExpenseAccessDecision.Allowed)
+        {
+            return FromDecision(decision, conflictMessage);
+        }
+
+        ExpenseDecisionOutcome outcome = decide(expense!, nowUtc);
+        if (outcome == ExpenseDecisionOutcome.SelfDecision)
+        {
+            return ExpenseOperationResult.Forbidden();
+        }
+
+        if (outcome == ExpenseDecisionOutcome.NotSubmitted)
+        {
+            return ExpenseOperationResult.Conflict(conflictMessage);
+        }
+
+        // The new state and its history entry are saved by the same SaveChanges call. A concurrent
+        // decision changes the status first, so this update matches no row and nothing is saved.
+        if (!await TrySaveAsync(context, cancellationToken))
+        {
+            return ExpenseOperationResult.Conflict(conflictMessage);
+        }
+
+        return ExpenseOperationResult.Success(expense!);
+    }
 
     private static ExpenseOperationResult FromDecision(ExpenseAccessDecision decision, string conflictMessage) =>
         decision switch

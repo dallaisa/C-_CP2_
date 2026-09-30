@@ -61,22 +61,19 @@ internal static class ExpenseAccessPolicy
             return ExpenseAccessDecision.Forbidden;
         }
 
-        // Expenses that already left the approval queue stay in scope so a repeated decision is a conflict.
-        bool inScope = expense is not null
-            && (CanRead(viewer, expense)
-                || expense.Status is ExpenseStatus.Approved or ExpenseStatus.Rejected or ExpenseStatus.Paid);
-        if (!inScope)
+        if (expense is null)
         {
             return ExpenseAccessDecision.NotFound;
         }
 
         // The owner never decides on their own expense, whatever other roles they have.
-        if (IsOwner(viewer, expense!))
+        if (IsOwner(viewer, expense))
         {
             return ExpenseAccessDecision.Forbidden;
         }
 
-        return expense!.Status == ExpenseStatus.Submitted
+        // Any state other than Submitted (Draft, or a decision already taken) is an incompatible transition.
+        return expense.Status == ExpenseStatus.Submitted
             ? ExpenseAccessDecision.Allowed
             : ExpenseAccessDecision.Conflict;
     }
