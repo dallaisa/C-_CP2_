@@ -1,4 +1,4 @@
-# ExpenseHub — I01 a I08
+# ExpenseHub — I01 a I09
 
 Versão preparada para concluir:
 
@@ -10,6 +10,7 @@ Versão preparada para concluir:
 - **I06 — Ownership e matriz de acesso**
 - **I07 — Aprovar e reprovar com justificativa**
 - **I08 — Pagamento e histórico**
+- **I09 — Testes unitários**
 
 ## I01 implementada
 
@@ -251,6 +252,39 @@ Detalhes:
 | Finance pagando reembolso próprio | `403 Forbidden` |
 | Reembolso inexistente; histórico fora do escopo | `404 Not Found` |
 | Pagamento fora de `Approved` ou repetido | `409 Conflict` |
+
+## I09 implementada
+
+Testes unitários em `sources/ExpenseHub.UnitTests` (MSTest), executados sem banco de dados, rede,
+servidor HTTP ou serviço externo. As regras de negócio ficam em classes de domínio puras
+(`ExpenseDraftRules`, `ExpenseDecisionRules`, `ExpensePaymentRules`, `ExpenseAccessPolicy`,
+`ExpenseVisibility` e validadores), por isso os testes não precisam de mocks nem de infraestrutura.
+
+```shell
+dotnet test ./sources/ExpenseHub.slnx
+```
+
+| Arquivo | Regras verificadas |
+|---|---|
+| `ExpenseStateMachineTests` | Cada ação contra cada estado: só as transições do contrato são aceitas; ações recusadas não alteram estado, histórico nem pagamento |
+| `ExpenseDraftRulesTests` | Criação em `Draft` com dono e id do servidor; edição só pelo dono e em `Draft`; histórico `Created`/`Updated` com alterações |
+| `ExpenseSubmitRulesTests` | `Draft → Submitted`; repetição sem duplicar histórico; outro usuário; estados inválidos |
+| `ExpenseDecisionRulesTests` | Aprovação e reprovação válidas; justificativa no histórico; autodecisão; estado incompatível; `Rejected` final |
+| `ExpensePaymentRulesTests` | `Approved → Paid` com `PaymentRecord` e histórico; autopagamento; estados inválidos; pagamento duplicado |
+| `ExpenseAccessPolicyTests` | Ownership e decisões contextuais (`404`/`403`/`409`); roles acumuladas; Auditor sem escrita; Admin sem acesso |
+| `ExpenseVisibilityTests` | Matriz de leitura por perfil e união de roles |
+| `ExpenseHistoryFlowTests` | Histórico completo do fluxo pago e do reprovado; ator, estados e instante UTC |
+| `ExpenseRequestValidatorTests` | Descrição, valor, casas decimais, data futura, categoria |
+| `RejectExpenseRequestValidatorTests` | Justificativa obrigatória entre 10 e 500 caracteres |
+| `ExpenseResponseTests` | Estado por nome e dados do pagamento no contrato da API |
+
+### Capacidade de detectar regressões
+
+Para verificar que os testes falham quando uma regra é quebrada, 19 defeitos simples foram introduzidos
+manualmente, um por vez, no código de produção (por exemplo: permitir autoaprovação, permitir
+autopagamento, aceitar envio fora de `Draft`, não gravar a justificativa, Employee ver reembolsos alheios,
+aceitar data futura, não converter o horário para UTC). Em todos os 19 casos ao menos um teste falhou;
+o código original foi restaurado após cada verificação.
 
 ## Banco de dados
 
@@ -684,6 +718,14 @@ referência: Racass/checkpoint-csharpracass-expensehub#7
 branch: i08-payment-history
 PR: I08 — Pagamento e histórico
 referência: Racass/checkpoint-csharpracass-expensehub#8
+```
+
+### I09
+
+```text
+branch: i09-unit-tests
+PR: I09 — Testes unitários
+referência: Racass/checkpoint-csharpracass-expensehub#9
 ```
 
 Não use `Closes`, `Fixes` ou `Resolves` nas referências ao backlog central.

@@ -221,6 +221,44 @@ public sealed class ExpenseAccessPolicyTests
         }
     }
 
+    /// <summary>Approver and Finance together still cannot approve or pay their own expense.</summary>
+    [TestMethod]
+    public void ApproverAndFinanceTogetherCannotActOnOwnExpense()
+    {
+        ExpenseViewer actor = new ExpenseViewer { UserId = ActorId, IsApprover = true, IsFinance = true };
+
+        Assert.AreEqual(
+            ExpenseAccessDecision.Forbidden,
+            ExpenseAccessPolicy.EvaluateApprovalDecision(actor, CreateExpense(ActorId, ExpenseStatus.Submitted)));
+        Assert.AreEqual(
+            ExpenseAccessDecision.Forbidden,
+            ExpenseAccessPolicy.EvaluatePayment(actor, CreateExpense(ActorId, ExpenseStatus.Approved)));
+    }
+
+    /// <summary>Seeing an expense through another role does not allow paying it outside Approved.</summary>
+    [TestMethod]
+    public void ApproverAndFinanceCannotPayAnotherUsersSubmittedExpense()
+    {
+        ExpenseViewer actor = new ExpenseViewer { UserId = ActorId, IsApprover = true, IsFinance = true };
+        Expense submitted = CreateExpense(OtherId, ExpenseStatus.Submitted);
+
+        Assert.IsTrue(ExpenseAccessPolicy.CanRead(actor, submitted));
+        Assert.AreEqual(ExpenseAccessDecision.Conflict, ExpenseAccessPolicy.EvaluatePayment(actor, submitted));
+        Assert.AreEqual(ExpenseAccessDecision.Allowed, ExpenseAccessPolicy.EvaluateApprovalDecision(actor, submitted));
+    }
+
+    /// <summary>A user without an identifier is never treated as the owner of an expense.</summary>
+    [TestMethod]
+    public void ViewerWithoutIdentifierOwnsNothing()
+    {
+        ExpenseViewer anonymousEmployee = new ExpenseViewer { UserId = string.Empty, IsEmployee = true };
+
+        Assert.IsFalse(ExpenseAccessPolicy.CanRead(anonymousEmployee, CreateExpense(string.Empty, ExpenseStatus.Draft)));
+        Assert.AreEqual(
+            ExpenseAccessDecision.NotFound,
+            ExpenseAccessPolicy.EvaluateDraftChange(anonymousEmployee, CreateExpense(string.Empty, ExpenseStatus.Draft)));
+    }
+
     private static ExpenseViewer Employee() => new ExpenseViewer { UserId = ActorId, IsEmployee = true };
 
     private static ExpenseViewer Approver() => new ExpenseViewer { UserId = ActorId, IsApprover = true };
