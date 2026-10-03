@@ -1,23 +1,25 @@
-namespace ExpenseHub.Api.Endpoints;
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Security.Claims;
+using System.Threading;
 using System.Threading.Tasks;
 using ExpenseHub.Api.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+
+namespace ExpenseHub.Api.Endpoints;
 
 /// <summary>
 /// Defines registration and user administration endpoints.
 /// </summary>
 internal static class UserEndpoints
 {
-    private static readonly HashSet<string> AllowedRoles = new (StringComparer.Ordinal)
+    private static readonly HashSet<string> _allowedRoles = new HashSet<string>(StringComparer.Ordinal)
     {
         ApplicationRoles.Admin,
         ApplicationRoles.Employee,
@@ -63,7 +65,7 @@ internal static class UserEndpoints
                 title: "An account with this email already exists.");
         }
 
-        AppUser user = new ()
+        AppUser user = new AppUser
         {
             Email = email,
             UserName = email,
@@ -87,10 +89,17 @@ internal static class UserEndpoints
             new RegisteredUserResponse(user.Id, user.Email));
     }
 
-    private static async Task<IResult> ListUsersAsync(UserManager<AppUser> userManager)
+    private static async Task<IResult> ListUsersAsync(
+        UserManager<AppUser> userManager,
+        CancellationToken cancellationToken)
     {
-        List<UserResponse> users = new ();
-        foreach (AppUser user in userManager.Users.OrderBy(user => user.Email))
+        // The query is materialized asynchronously before the per-user role lookups run.
+        List<AppUser> appUsers = await userManager.Users
+            .OrderBy(user => user.Email)
+            .ToListAsync(cancellationToken);
+
+        List<UserResponse> users = new List<UserResponse>();
+        foreach (AppUser user in appUsers)
         {
             IList<string> roles = await userManager.GetRolesAsync(user);
             users.Add(new UserResponse(user.Id, user.Email, roles));
@@ -123,7 +132,7 @@ internal static class UserEndpoints
         string[] desiredRoles = requestedRoles
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        string? invalidRole = desiredRoles.FirstOrDefault(role => !AllowedRoles.Contains(role));
+        string? invalidRole = desiredRoles.FirstOrDefault(role => !_allowedRoles.Contains(role));
         if (invalidRole is not null)
         {
             return Results.Problem(
@@ -227,8 +236,8 @@ internal static class UserEndpoints
         /// <param name="email">The new user's email address.</param>
         internal RegisteredUserResponse(string id, string? email)
         {
-            this.Id = id;
-            this.Email = email;
+            Id = id;
+            Email = email;
         }
 
         /// <summary>Gets the new user's identifier.</summary>
@@ -246,9 +255,9 @@ internal static class UserEndpoints
         /// <param name="roles">The user's current roles.</param>
         internal UserResponse(string id, string? email, IList<string> roles)
         {
-            this.Id = id;
-            this.Email = email;
-            this.Roles = roles;
+            Id = id;
+            Email = email;
+            Roles = roles;
         }
 
         /// <summary>Gets the user's identifier.</summary>

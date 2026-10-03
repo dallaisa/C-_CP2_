@@ -1,6 +1,6 @@
-namespace ExpenseHub.Api.Identity;
-
 using Microsoft.AspNetCore.Identity;
+
+namespace ExpenseHub.Api.Identity;
 
 /// <summary>
 /// Represents an ExpenseHub identity user.

@@ -1,6 +1,6 @@
-namespace ExpenseHub.Api.Domain;
-
 using System;
+
+namespace ExpenseHub.Api.Domain;
 
 /// <summary>
 /// Combines role, ownership, state and visibility into the contextual decisions of the access matrix.

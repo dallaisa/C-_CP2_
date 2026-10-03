@@ -1,6 +1,6 @@
-namespace ExpenseHub.Api.Domain;
-
 using System.Collections.Generic;
+
+namespace ExpenseHub.Api.Domain;
 
 /// <summary>
 /// Defines a category used to classify expenses.

@@ -1,9 +1,9 @@
-namespace ExpenseHub.UnitTests.Expenses;
-
 using System;
 using System.Linq;
 using ExpenseHub.Api.Domain;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace ExpenseHub.UnitTests.Expenses;
 
 /// <summary>
 /// Checks every action against every state, so that only the transitions in the contract are accepted.
@@ -20,7 +20,7 @@ public sealed class ExpenseStateMachineTests
     private const string ApproverId = "approver";
     private const string FinanceId = "finance";
 
-    private static readonly DateTimeOffset Now = new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _now = new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
 
     /// <summary>Only a draft can be edited, and editing keeps it as a draft.</summary>
     /// <param name="status">The numeric value of the current status.</param>
@@ -35,7 +35,7 @@ public sealed class ExpenseStateMachineTests
     {
         Expense expense = CreateExpense((ExpenseStatus)status);
 
-        DraftEditOutcome outcome = ExpenseDraftRules.EditDraft(expense, OwnerId, ChangedValues(), Now);
+        DraftEditOutcome outcome = ExpenseDraftRules.EditDraft(expense, OwnerId, ChangedValues(), _now);
 
         Assert.AreEqual(allowed ? DraftEditOutcome.Updated : DraftEditOutcome.NotDraft, outcome);
         AssertTransition(expense, (ExpenseStatus)status, allowed ? ExpenseStatus.Draft : (ExpenseStatus)status, allowed);
@@ -54,7 +54,7 @@ public sealed class ExpenseStateMachineTests
     {
         Expense expense = CreateExpense((ExpenseStatus)status);
 
-        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense, OwnerId, Now);
+        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense, OwnerId, _now);
 
         Assert.AreEqual(allowed ? DraftSubmitOutcome.Submitted : DraftSubmitOutcome.NotDraft, outcome);
         AssertTransition(expense, (ExpenseStatus)status, ExpenseStatus.Submitted, allowed);
@@ -73,7 +73,7 @@ public sealed class ExpenseStateMachineTests
     {
         Expense expense = CreateExpense((ExpenseStatus)status);
 
-        ExpenseDecisionOutcome outcome = ExpenseDecisionRules.Approve(expense, ApproverId, Now);
+        ExpenseDecisionOutcome outcome = ExpenseDecisionRules.Approve(expense, ApproverId, _now);
 
         Assert.AreEqual(allowed ? ExpenseDecisionOutcome.Applied : ExpenseDecisionOutcome.NotSubmitted, outcome);
         AssertTransition(expense, (ExpenseStatus)status, ExpenseStatus.Approved, allowed);
@@ -93,7 +93,7 @@ public sealed class ExpenseStateMachineTests
         Expense expense = CreateExpense((ExpenseStatus)status);
 
         ExpenseDecisionOutcome outcome =
-            ExpenseDecisionRules.Reject(expense, ApproverId, "Comprovante ilegível", Now);
+            ExpenseDecisionRules.Reject(expense, ApproverId, "Comprovante ilegível", _now);
 
         Assert.AreEqual(allowed ? ExpenseDecisionOutcome.Applied : ExpenseDecisionOutcome.NotSubmitted, outcome);
         AssertTransition(expense, (ExpenseStatus)status, ExpenseStatus.Rejected, allowed);
@@ -112,7 +112,7 @@ public sealed class ExpenseStateMachineTests
     {
         Expense expense = CreateExpense((ExpenseStatus)status);
 
-        ExpensePaymentOutcome outcome = ExpensePaymentRules.Pay(expense, FinanceId, Now);
+        ExpensePaymentOutcome outcome = ExpensePaymentRules.Pay(expense, FinanceId, _now);
 
         Assert.AreEqual(allowed ? ExpensePaymentOutcome.Paid : ExpensePaymentOutcome.NotApproved, outcome);
         AssertTransition(expense, (ExpenseStatus)status, ExpenseStatus.Paid, allowed);

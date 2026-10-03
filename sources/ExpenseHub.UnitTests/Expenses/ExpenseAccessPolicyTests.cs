@@ -1,8 +1,8 @@
-namespace ExpenseHub.UnitTests.Expenses;
-
 using System;
 using ExpenseHub.Api.Domain;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace ExpenseHub.UnitTests.Expenses;
 
 /// <summary>
 /// Tests the contextual decisions of the access matrix.

@@ -1,9 +1,9 @@
-namespace ExpenseHub.UnitTests.Expenses;
-
 using System;
 using ExpenseHub.Api.Domain;
 using ExpenseHub.Api.Expenses;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace ExpenseHub.UnitTests.Expenses;
 
 /// <summary>
 /// Tests the expense data exposed by the API contract.
@@ -11,7 +11,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 [TestClass]
 public sealed class ExpenseResponseTests
 {
-    private static readonly DateTimeOffset Now = new DateTimeOffset(2026, 9, 20, 15, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _now = new DateTimeOffset(2026, 9, 20, 15, 0, 0, TimeSpan.Zero);
 
     /// <summary>An unpaid expense exposes its status by name and no payment data.</summary>
     [TestMethod]
@@ -31,13 +31,13 @@ public sealed class ExpenseResponseTests
     public void PaidExpenseExposesPaymentActorAndTime()
     {
         Expense expense = new Expense { Id = Guid.NewGuid(), OwnerId = "owner", Status = ExpenseStatus.Approved };
-        ExpensePaymentRules.Pay(expense, "finance", Now);
+        ExpensePaymentRules.Pay(expense, "finance", _now);
 
         ExpenseResponse response = ExpenseResponse.FromExpense(expense);
 
         Assert.AreEqual("Paid", response.Status);
         Assert.AreEqual("finance", response.PaidByUserId);
-        Assert.AreEqual(Now, response.PaidAtUtc);
+        Assert.AreEqual(_now, response.PaidAtUtc);
         Assert.AreEqual("owner", response.OwnerId);
     }
 }

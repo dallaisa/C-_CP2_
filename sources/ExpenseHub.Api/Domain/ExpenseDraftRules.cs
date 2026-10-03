@@ -1,16 +1,16 @@
-namespace ExpenseHub.Api.Domain;
-
 using System;
 using System.Collections.Generic;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+
+namespace ExpenseHub.Api.Domain;
 
 /// <summary>
 /// Applies the creation, edition and submission rules of draft expenses.
 /// </summary>
 internal static class ExpenseDraftRules
 {
-    private static readonly JsonSerializerOptions ChangesSerializerOptions = new JsonSerializerOptions
+    private static readonly JsonSerializerOptions _changesSerializerOptions = new JsonSerializerOptions
     {
         // History is stored data, not HTML, so non-ASCII text is kept readable.
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -116,7 +116,7 @@ internal static class ExpenseDraftRules
             OccurredAtUtc = nowUtc.ToUniversalTime(),
             PreviousStatus = ExpenseStatus.Draft,
             NewStatus = ExpenseStatus.Draft,
-            Changes = JsonSerializer.Serialize(changes, ChangesSerializerOptions),
+            Changes = JsonSerializer.Serialize(changes, _changesSerializerOptions),
         });
 
         return DraftEditOutcome.Updated;

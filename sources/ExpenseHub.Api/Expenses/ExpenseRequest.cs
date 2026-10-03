@@ -1,7 +1,7 @@
-namespace ExpenseHub.Api.Expenses;
-
 using System;
 using System.ComponentModel.DataAnnotations;
+
+namespace ExpenseHub.Api.Expenses;
 
 /// <summary>
 /// Represents the fields a client may send to create or edit a draft expense.

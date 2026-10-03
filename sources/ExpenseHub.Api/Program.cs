@@ -1,5 +1,3 @@
-namespace ExpenseHub.Api;
-
 using System;
 using System.Threading.Tasks;
 using ExpenseHub.Api.Endpoints;
@@ -14,6 +12,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+
+namespace ExpenseHub.Api;
 
 /// <summary>
 /// Defines the application entry point.

@@ -1,7 +1,7 @@
-namespace ExpenseHub.Api.Domain;
-
 using System;
 using System.Collections.Generic;
+
+namespace ExpenseHub.Api.Domain;
 
 /// <summary>
 /// Represents an expense submitted by an owner.

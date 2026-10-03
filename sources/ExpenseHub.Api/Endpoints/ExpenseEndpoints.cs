@@ -1,5 +1,3 @@
-namespace ExpenseHub.Api.Endpoints;
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,12 +11,14 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
+namespace ExpenseHub.Api.Endpoints;
+
 /// <summary>
 /// Defines expense endpoints.
 /// </summary>
 internal static class ExpenseEndpoints
 {
-    private static readonly string[] ReaderRoles =
+    private static readonly string[] _readerRoles =
     [
         ApplicationRoles.Employee,
         ApplicationRoles.Approver,
@@ -52,13 +52,13 @@ internal static class ExpenseEndpoints
 
         // Admin is intentionally absent: it grants no functional access to expenses.
         endpoints.MapGet("/api/expenses", ListAsync)
-            .RequireAuthorization(policy => policy.RequireRole(ReaderRoles));
+            .RequireAuthorization(policy => policy.RequireRole(_readerRoles));
 
         endpoints.MapGet("/api/expenses/{id:guid}", GetByIdAsync)
-            .RequireAuthorization(policy => policy.RequireRole(ReaderRoles));
+            .RequireAuthorization(policy => policy.RequireRole(_readerRoles));
 
         endpoints.MapGet("/api/expenses/{id:guid}/history", GetHistoryAsync)
-            .RequireAuthorization(policy => policy.RequireRole(ReaderRoles));
+            .RequireAuthorization(policy => policy.RequireRole(_readerRoles));
 
         return endpoints;
     }

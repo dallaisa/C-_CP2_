@@ -1,8 +1,8 @@
-namespace ExpenseHub.Api.Expenses;
-
 using System;
 using System.Text.Json.Nodes;
 using ExpenseHub.Api.Domain;
+
+namespace ExpenseHub.Api.Expenses;
 
 /// <summary>
 /// Represents a history entry returned by the API.
