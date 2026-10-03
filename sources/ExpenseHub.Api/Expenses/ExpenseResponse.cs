@@ -32,6 +32,12 @@ internal sealed class ExpenseResponse
     /// <summary>Gets the name of the expense category, when loaded.</summary>
     public string? CategoryName { get; init; }
 
+    /// <summary>Gets the identifier of the Finance user who paid the expense, when paid.</summary>
+    public string? PaidByUserId { get; init; }
+
+    /// <summary>Gets the UTC time of the payment, when paid.</summary>
+    public DateTimeOffset? PaidAtUtc { get; init; }
+
     /// <summary>Creates a response from an expense entity.</summary>
     /// <param name="expense">The expense entity.</param>
     /// <returns>The response DTO.</returns>
@@ -49,6 +55,8 @@ internal sealed class ExpenseResponse
             Status = expense.Status.ToString(),
             CategoryId = expense.ExpenseCategoryId,
             CategoryName = expense.Category?.Name,
+            PaidByUserId = expense.Payment?.ActorId,
+            PaidAtUtc = expense.Payment?.PaidAtUtc,
         };
     }
 }

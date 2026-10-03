@@ -91,7 +91,7 @@ internal static class ExpenseAccessPolicy
             return ExpenseAccessDecision.Forbidden;
         }
 
-        if (expense is null || !CanRead(viewer, expense))
+        if (expense is null)
         {
             return ExpenseAccessDecision.NotFound;
         }
@@ -102,6 +102,7 @@ internal static class ExpenseAccessPolicy
             return ExpenseAccessDecision.Forbidden;
         }
 
+        // Any state other than Approved (not yet approved, rejected or already paid) is an incompatible transition.
         return expense.Status == ExpenseStatus.Approved
             ? ExpenseAccessDecision.Allowed
             : ExpenseAccessDecision.Conflict;
