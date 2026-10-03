@@ -1,6 +1,6 @@
-namespace ExpenseHub.Api.Expenses;
-
 using System.ComponentModel.DataAnnotations;
+
+namespace ExpenseHub.Api.Expenses;
 
 /// <summary>
 /// Represents the body of a rejection request.

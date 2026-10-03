@@ -1,9 +1,9 @@
-namespace ExpenseHub.UnitTests.Expenses;
-
 using System;
 using System.Linq;
 using ExpenseHub.Api.Domain;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace ExpenseHub.UnitTests.Expenses;
 
 /// <summary>
 /// Tests the Draft to Submitted transition.
@@ -14,8 +14,8 @@ public sealed class ExpenseSubmitRulesTests
     private const string OwnerId = "owner-1";
     private const string OtherUserId = "owner-2";
 
-    private static readonly DateTimeOffset CreatedAt = new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
-    private static readonly DateTimeOffset SubmittedAt = new DateTimeOffset(2026, 9, 3, 9, 15, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _createdAt = new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _submittedAt = new DateTimeOffset(2026, 9, 3, 9, 15, 0, TimeSpan.Zero);
 
     /// <summary>The owner submits a draft and the transition is recorded.</summary>
     [TestMethod]
@@ -23,7 +23,7 @@ public sealed class ExpenseSubmitRulesTests
     {
         Expense expense = CreateDraft();
 
-        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense, OwnerId, SubmittedAt);
+        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense, OwnerId, _submittedAt);
 
         Assert.AreEqual(DraftSubmitOutcome.Submitted, outcome);
         Assert.AreEqual(ExpenseStatus.Submitted, expense.Status);
@@ -32,7 +32,7 @@ public sealed class ExpenseSubmitRulesTests
         Assert.AreEqual(ExpenseHistoryActions.Submitted, entry.Action);
         Assert.AreEqual(expense.Id, entry.ExpenseId);
         Assert.AreEqual(OwnerId, entry.ActorId);
-        Assert.AreEqual(SubmittedAt, entry.OccurredAtUtc);
+        Assert.AreEqual(_submittedAt, entry.OccurredAtUtc);
         Assert.AreEqual(ExpenseStatus.Draft, entry.PreviousStatus);
         Assert.AreEqual(ExpenseStatus.Submitted, entry.NewStatus);
     }
@@ -42,9 +42,9 @@ public sealed class ExpenseSubmitRulesTests
     public void RepeatedSubmitIsRejectedWithoutDuplicatingHistory()
     {
         Expense expense = CreateDraft();
-        ExpenseDraftRules.Submit(expense, OwnerId, SubmittedAt);
+        ExpenseDraftRules.Submit(expense, OwnerId, _submittedAt);
 
-        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense, OwnerId, SubmittedAt.AddMinutes(1));
+        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense, OwnerId, _submittedAt.AddMinutes(1));
 
         Assert.AreEqual(DraftSubmitOutcome.NotDraft, outcome);
         Assert.AreEqual(ExpenseStatus.Submitted, expense.Status);
@@ -57,7 +57,7 @@ public sealed class ExpenseSubmitRulesTests
     {
         Expense expense = CreateDraft();
 
-        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense, OtherUserId, SubmittedAt);
+        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense, OtherUserId, _submittedAt);
 
         Assert.AreEqual(DraftSubmitOutcome.NotOwner, outcome);
         Assert.AreEqual(ExpenseStatus.Draft, expense.Status);
@@ -76,7 +76,7 @@ public sealed class ExpenseSubmitRulesTests
         Expense expense = CreateDraft();
         expense.Status = (ExpenseStatus)status;
 
-        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense, OwnerId, SubmittedAt);
+        DraftSubmitOutcome outcome = ExpenseDraftRules.Submit(expense, OwnerId, _submittedAt);
 
         Assert.AreEqual(DraftSubmitOutcome.NotDraft, outcome);
         Assert.AreEqual((ExpenseStatus)status, expense.Status);
@@ -88,7 +88,7 @@ public sealed class ExpenseSubmitRulesTests
     public void SubmittedExpenseCannotBeEdited()
     {
         Expense expense = CreateDraft();
-        ExpenseDraftRules.Submit(expense, OwnerId, SubmittedAt);
+        ExpenseDraftRules.Submit(expense, OwnerId, _submittedAt);
 
         DraftEditOutcome outcome = ExpenseDraftRules.EditDraft(
             expense,
@@ -100,7 +100,7 @@ public sealed class ExpenseSubmitRulesTests
                 ExpenseDate = new DateOnly(2026, 8, 31),
                 ExpenseCategoryId = 1,
             },
-            SubmittedAt.AddMinutes(1));
+            _submittedAt.AddMinutes(1));
 
         Assert.AreEqual(DraftEditOutcome.NotDraft, outcome);
     }
@@ -116,6 +116,6 @@ public sealed class ExpenseSubmitRulesTests
                 ExpenseDate = new DateOnly(2026, 8, 31),
                 ExpenseCategoryId = 1,
             },
-            CreatedAt);
+            _createdAt);
     }
 }

@@ -1,11 +1,11 @@
-namespace ExpenseHub.UnitTests.Expenses;
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using ExpenseHub.Api.Domain;
 using ExpenseHub.Api.Expenses;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace ExpenseHub.UnitTests.Expenses;
 
 /// <summary>
 /// Tests the history produced by the complete expense workflow.
@@ -17,17 +17,17 @@ public sealed class ExpenseHistoryFlowTests
     private const string ApproverId = "approver";
     private const string FinanceId = "finance";
 
-    private static readonly DateTimeOffset Start = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _start = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero);
 
     /// <summary>Create, edit, submit, approve and pay produce one ordered entry each.</summary>
     [TestMethod]
     public void PaidFlowRecordsEveryStep()
     {
-        Expense expense = ExpenseDraftRules.CreateDraft(EmployeeId, CreateValues("Almoço com cliente"), Start);
-        ExpenseDraftRules.EditDraft(expense, EmployeeId, CreateValues("Jantar com cliente"), Start.AddHours(1));
-        ExpenseDraftRules.Submit(expense, EmployeeId, Start.AddHours(2));
-        ExpenseDecisionRules.Approve(expense, ApproverId, Start.AddHours(3));
-        ExpensePaymentRules.Pay(expense, FinanceId, Start.AddHours(4));
+        Expense expense = ExpenseDraftRules.CreateDraft(EmployeeId, CreateValues("Almoço com cliente"), _start);
+        ExpenseDraftRules.EditDraft(expense, EmployeeId, CreateValues("Jantar com cliente"), _start.AddHours(1));
+        ExpenseDraftRules.Submit(expense, EmployeeId, _start.AddHours(2));
+        ExpenseDecisionRules.Approve(expense, ApproverId, _start.AddHours(3));
+        ExpensePaymentRules.Pay(expense, FinanceId, _start.AddHours(4));
 
         List<ExpenseHistory> history = expense.History.ToList();
 
@@ -58,11 +58,11 @@ public sealed class ExpenseHistoryFlowTests
     [TestMethod]
     public void RejectedFlowRecordsJustificationAndCannotBePaid()
     {
-        Expense expense = ExpenseDraftRules.CreateDraft(EmployeeId, CreateValues("Almoço com cliente"), Start);
-        ExpenseDraftRules.Submit(expense, EmployeeId, Start.AddHours(1));
-        ExpenseDecisionRules.Reject(expense, ApproverId, "Comprovante ilegível", Start.AddHours(2));
+        Expense expense = ExpenseDraftRules.CreateDraft(EmployeeId, CreateValues("Almoço com cliente"), _start);
+        ExpenseDraftRules.Submit(expense, EmployeeId, _start.AddHours(1));
+        ExpenseDecisionRules.Reject(expense, ApproverId, "Comprovante ilegível", _start.AddHours(2));
 
-        ExpensePaymentOutcome payment = ExpensePaymentRules.Pay(expense, FinanceId, Start.AddHours(3));
+        ExpensePaymentOutcome payment = ExpensePaymentRules.Pay(expense, FinanceId, _start.AddHours(3));
 
         Assert.AreEqual(ExpensePaymentOutcome.NotApproved, payment);
         Assert.HasCount(3, expense.History);
@@ -75,8 +75,8 @@ public sealed class ExpenseHistoryFlowTests
     [TestMethod]
     public void HistoryResponseMapsStatusesAndChanges()
     {
-        Expense expense = ExpenseDraftRules.CreateDraft(EmployeeId, CreateValues("Almoço com cliente"), Start);
-        ExpenseDraftRules.EditDraft(expense, EmployeeId, CreateValues("Jantar com cliente"), Start.AddHours(1));
+        Expense expense = ExpenseDraftRules.CreateDraft(EmployeeId, CreateValues("Almoço com cliente"), _start);
+        ExpenseDraftRules.EditDraft(expense, EmployeeId, CreateValues("Jantar com cliente"), _start.AddHours(1));
 
         ExpenseHistoryResponse response = ExpenseHistoryResponse.FromHistory(expense.History.Last());
 

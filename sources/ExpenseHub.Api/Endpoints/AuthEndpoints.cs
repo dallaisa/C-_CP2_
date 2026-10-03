@@ -1,6 +1,3 @@
-namespace ExpenseHub.Api.Endpoints;
-
-using System;
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using ExpenseHub.Api.Identity;
@@ -8,6 +5,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
+
+namespace ExpenseHub.Api.Endpoints;
 
 /// <summary>
 /// Defines authentication endpoints for the application.

@@ -1,9 +1,9 @@
-namespace ExpenseHub.UnitTests.Expenses;
-
 using System;
 using System.Linq;
 using ExpenseHub.Api.Domain;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace ExpenseHub.UnitTests.Expenses;
 
 /// <summary>
 /// Tests the creation and edition rules of draft expenses.
@@ -14,14 +14,14 @@ public sealed class ExpenseDraftRulesTests
     private const string OwnerId = "owner-1";
     private const string OtherUserId = "owner-2";
 
-    private static readonly DateTimeOffset CreatedAt = new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
-    private static readonly DateTimeOffset EditedAt = new DateTimeOffset(2026, 9, 2, 8, 30, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _createdAt = new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _editedAt = new DateTimeOffset(2026, 9, 2, 8, 30, 0, TimeSpan.Zero);
 
     /// <summary>A new expense is a draft owned by the authenticated user with a server generated id.</summary>
     [TestMethod]
     public void CreateDraftUsesServerControlledValues()
     {
-        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), CreatedAt);
+        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), _createdAt);
 
         Assert.AreNotEqual(Guid.Empty, expense.Id);
         Assert.AreEqual(OwnerId, expense.OwnerId);
@@ -34,8 +34,8 @@ public sealed class ExpenseDraftRulesTests
     [TestMethod]
     public void CreateDraftGeneratesDistinctIds()
     {
-        Expense first = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), CreatedAt);
-        Expense second = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), CreatedAt);
+        Expense first = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), _createdAt);
+        Expense second = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), _createdAt);
 
         Assert.AreNotEqual(first.Id, second.Id);
     }
@@ -44,12 +44,12 @@ public sealed class ExpenseDraftRulesTests
     [TestMethod]
     public void CreateDraftRecordsCreationHistory()
     {
-        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), CreatedAt);
+        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), _createdAt);
 
         ExpenseHistory entry = expense.History.Single();
         Assert.AreEqual(ExpenseHistoryActions.Created, entry.Action);
         Assert.AreEqual(OwnerId, entry.ActorId);
-        Assert.AreEqual(CreatedAt, entry.OccurredAtUtc);
+        Assert.AreEqual(_createdAt, entry.OccurredAtUtc);
         Assert.IsNull(entry.PreviousStatus);
         Assert.AreEqual(ExpenseStatus.Draft, entry.NewStatus);
     }
@@ -58,10 +58,10 @@ public sealed class ExpenseDraftRulesTests
     [TestMethod]
     public void EditDraftByOwnerUpdatesFieldsAndRecordsChanges()
     {
-        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), CreatedAt);
+        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), _createdAt);
         ExpenseDraftValues newValues = CreateValues(description: "Jantar com cliente", amount: 200m, categoryId: 2);
 
-        DraftEditOutcome outcome = ExpenseDraftRules.EditDraft(expense, OwnerId, newValues, EditedAt);
+        DraftEditOutcome outcome = ExpenseDraftRules.EditDraft(expense, OwnerId, newValues, _editedAt);
 
         Assert.AreEqual(DraftEditOutcome.Updated, outcome);
         Assert.AreEqual("Jantar com cliente", expense.Description);
@@ -73,7 +73,7 @@ public sealed class ExpenseDraftRulesTests
         ExpenseHistory entry = expense.History.Last();
         Assert.AreEqual(ExpenseHistoryActions.Updated, entry.Action);
         Assert.AreEqual(OwnerId, entry.ActorId);
-        Assert.AreEqual(EditedAt, entry.OccurredAtUtc);
+        Assert.AreEqual(_editedAt, entry.OccurredAtUtc);
         Assert.AreEqual(ExpenseStatus.Draft, entry.PreviousStatus);
         Assert.AreEqual(ExpenseStatus.Draft, entry.NewStatus);
         Assert.IsNotNull(entry.Changes);
@@ -89,13 +89,13 @@ public sealed class ExpenseDraftRulesTests
     [TestMethod]
     public void EditDraftByAnotherUserIsRejected()
     {
-        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), CreatedAt);
+        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), _createdAt);
 
         DraftEditOutcome outcome = ExpenseDraftRules.EditDraft(
             expense,
             OtherUserId,
             CreateValues(description: "Descrição alterada indevidamente"),
-            EditedAt);
+            _editedAt);
 
         Assert.AreEqual(DraftEditOutcome.NotOwner, outcome);
         Assert.AreEqual("Almoço com cliente", expense.Description);
@@ -111,14 +111,14 @@ public sealed class ExpenseDraftRulesTests
     [DataRow((int)ExpenseStatus.Paid)]
     public void EditDraftOutsideDraftIsRejected(int status)
     {
-        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), CreatedAt);
+        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), _createdAt);
         expense.Status = (ExpenseStatus)status;
 
         DraftEditOutcome outcome = ExpenseDraftRules.EditDraft(
             expense,
             OwnerId,
             CreateValues(description: "Descrição alterada fora do rascunho"),
-            EditedAt);
+            _editedAt);
 
         Assert.AreEqual(DraftEditOutcome.NotDraft, outcome);
         Assert.AreEqual("Almoço com cliente", expense.Description);
@@ -130,9 +130,9 @@ public sealed class ExpenseDraftRulesTests
     [TestMethod]
     public void EditDraftWithSameValuesRecordsNothing()
     {
-        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), CreatedAt);
+        Expense expense = ExpenseDraftRules.CreateDraft(OwnerId, CreateValues(), _createdAt);
 
-        DraftEditOutcome outcome = ExpenseDraftRules.EditDraft(expense, OwnerId, CreateValues(), EditedAt);
+        DraftEditOutcome outcome = ExpenseDraftRules.EditDraft(expense, OwnerId, CreateValues(), _editedAt);
 
         Assert.AreEqual(DraftEditOutcome.Unchanged, outcome);
         Assert.HasCount(1, expense.History);

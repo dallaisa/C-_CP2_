@@ -1,8 +1,8 @@
-namespace ExpenseHub.UnitTests.Expenses;
-
 using System.Collections.Generic;
 using ExpenseHub.Api.Expenses;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace ExpenseHub.UnitTests.Expenses;
 
 /// <summary>
 /// Tests the rejection justification contract.

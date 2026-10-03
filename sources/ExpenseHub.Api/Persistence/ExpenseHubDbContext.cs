@@ -1,10 +1,10 @@
-namespace ExpenseHub.Api.Persistence;
-
 using ExpenseHub.Api.Domain;
 using ExpenseHub.Api.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace ExpenseHub.Api.Persistence;
 
 /// <summary>
 /// Provides Entity Framework access to ExpenseHub and identity data.
@@ -19,16 +19,16 @@ internal sealed class ExpenseHubDbContext : IdentityDbContext<AppUser>
     }
 
     /// <summary>Gets the expenses in the database.</summary>
-    public DbSet<Expense> Expenses => this.Set<Expense>();
+    public DbSet<Expense> Expenses => Set<Expense>();
 
     /// <summary>Gets the expense categories in the database.</summary>
-    public DbSet<ExpenseCategory> ExpenseCategories => this.Set<ExpenseCategory>();
+    public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
 
     /// <summary>Gets the expense history entries in the database.</summary>
-    public DbSet<ExpenseHistory> ExpenseHistories => this.Set<ExpenseHistory>();
+    public DbSet<ExpenseHistory> ExpenseHistories => Set<ExpenseHistory>();
 
     /// <summary>Gets the payment records in the database.</summary>
-    public DbSet<PaymentRecord> PaymentRecords => this.Set<PaymentRecord>();
+    public DbSet<PaymentRecord> PaymentRecords => Set<PaymentRecord>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

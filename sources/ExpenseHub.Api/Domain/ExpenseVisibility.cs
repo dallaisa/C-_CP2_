@@ -1,7 +1,7 @@
-namespace ExpenseHub.Api.Domain;
-
 using System;
 using System.Linq.Expressions;
+
+namespace ExpenseHub.Api.Domain;
 
 /// <summary>
 /// Defines which expenses each profile can read.

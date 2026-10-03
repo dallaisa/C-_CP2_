@@ -1,7 +1,7 @@
-namespace ExpenseHub.Api.Expenses;
-
 using System.Collections.Generic;
 using ExpenseHub.Api.Domain;
+
+namespace ExpenseHub.Api.Expenses;
 
 /// <summary>
 /// Carries the result of an expense operation from the service to the endpoint.

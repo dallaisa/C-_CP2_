@@ -1,4 +1,4 @@
-# ExpenseHub — I01 a I09
+# ExpenseHub — I01 a I10
 
 Versão preparada para concluir:
 
@@ -11,6 +11,7 @@ Versão preparada para concluir:
 - **I07 — Aprovar e reprovar com justificativa**
 - **I08 — Pagamento e histórico**
 - **I09 — Testes unitários**
+- **I10 — Qualidade de Código**
 
 ## I01 implementada
 
@@ -286,6 +287,29 @@ autopagamento, aceitar envio fora de `Draft`, não gravar a justificativa, Emplo
 aceitar data futura, não converter o horário para UTC). Em todos os 19 casos ao menos um teste falhou;
 o código original foi restaurado após cada verificação.
 
+## I10 implementada
+
+- `.editorconfig`, `Directory.Build.props`, `.gitattributes`, `.github/`, `docs/`, `scripts/` e `tests/` restaurados
+  exatamente como no template oficial; o workflow `code-quality` roda em cada push e publica o artefato
+  `code-quality-report`;
+- `.gitignore` do template, acrescido das regras do SQLite local (`*.db`, `*.db-shm`, `*.db-wal`) e de `TestResults/`;
+- código ajustado à baseline oficial, sem desativar regras: `using` fora do namespace (IDE0065), sem `this.` (IDE0003),
+  campos privados com `_` (IDE1006), `using` desnecessário removido (IDE0005) e formatação (IDE0055);
+- listagem de usuários do Admin passou a materializar a consulta com `ToListAsync`, sem consulta síncrona no endpoint;
+- resultado local do script oficial: **100/100**, status `passed`, nenhum finding.
+
+### Executar o pipeline de qualidade localmente
+
+Requer PowerShell 7 e Gitleaks 8.30.1 (o workflow instala ambos). Na raiz do repositório:
+
+```shell
+pwsh ./tests/Invoke-CodeQuality.Unit.Tests.ps1
+pwsh ./tests/Invoke-CodeQuality.E2E.ps1
+pwsh ./scripts/Invoke-CodeQuality.ps1
+```
+
+O relatório é gerado em `artifacts/code-quality/` (`report.json` e `report.md`), pasta ignorada pelo Git.
+
 ## Banco de dados
 
 Provider: SQLite.
@@ -296,7 +320,33 @@ Pacotes principais:
 - `Microsoft.EntityFrameworkCore.Design` 10.0.12
 - `Microsoft.AspNetCore.Identity.EntityFrameworkCore` 10.0.12
 
-Na primeira execução, o banco local `expensehub.db` é criado automaticamente.
+### Configuração
+
+A connection string fica em `sources/ExpenseHub.Api/appsettings.json`, na chave `ConnectionStrings:ExpenseHub`:
+
+```json
+"ConnectionStrings": {
+  "ExpenseHub": "Data Source=expensehub.db"
+}
+```
+
+Ela não contém credenciais. Para usar outro arquivo, sobrescreva a chave sem alterar o arquivo, por exemplo com a
+variável de ambiente `ConnectionStrings__ExpenseHub`.
+
+### Criação e atualização do banco
+
+O projeto não usa migrations. Na inicialização, `DatabaseInitializer` executa, de forma idempotente:
+
+1. `EnsureCreatedAsync`, que cria o banco e todas as tabelas (domínio e Identity) quando o arquivo não existe;
+2. o seed das roles `Admin`, `Employee`, `Approver`, `Finance` e `Auditor`;
+3. o seed das categorias de despesa;
+4. o seed da conta Admin, somente se `SeedAdmin:Email` e `SeedAdmin:Password` estiverem configurados.
+
+Com `dotnet run --project ./sources/ExpenseHub.Api/ExpenseHub.Api.csproj`, o arquivo é criado em
+`sources/ExpenseHub.Api/expensehub.db`.
+
+`EnsureCreatedAsync` não altera um banco que já existe. Se o modelo mudar, recrie o banco local apagando
+`expensehub.db`, `expensehub.db-shm` e `expensehub.db-wal` e iniciando a aplicação novamente. Os dados locais são perdidos.
 
 Os arquivos locais do SQLite não devem ser versionados:
 
@@ -330,7 +380,7 @@ Não coloque a senha do Admin em:
 
 ## Executar
 
-Na raiz do repositório:
+Requer o .NET SDK 10. Na raiz do repositório:
 
 ```shell
 dotnet restore ./sources/ExpenseHub.slnx
@@ -345,6 +395,9 @@ O build deve concluir com:
 0 Error(s)
 0 Warning(s)
 ```
+
+Após o Admin alterar as roles de um usuário, esse usuário precisa fazer login novamente: o token anterior continua
+com as roles antigas até expirar.
 
 ## Autenticação
 
@@ -625,6 +678,7 @@ O projeto não deve versionar:
 bin/
 obj/
 *.dll
+*.exe
 *.pdb
 *.db
 *.db-shm
@@ -726,6 +780,14 @@ referência: Racass/checkpoint-csharpracass-expensehub#8
 branch: i09-unit-tests
 PR: I09 — Testes unitários
 referência: Racass/checkpoint-csharpracass-expensehub#9
+```
+
+### I10
+
+```text
+branch: i10-code-quality
+PR: I10 — Qualidade de Código
+referência: Racass/checkpoint-csharpracass-expensehub#10
 ```
 
 Não use `Closes`, `Fixes` ou `Resolves` nas referências ao backlog central.

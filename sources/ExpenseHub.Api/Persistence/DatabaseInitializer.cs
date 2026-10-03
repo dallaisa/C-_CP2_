@@ -1,5 +1,3 @@
-namespace ExpenseHub.Api.Persistence;
-
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -10,12 +8,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
+namespace ExpenseHub.Api.Persistence;
+
 /// <summary>
 /// Initializes the database and required identity records.
 /// </summary>
 internal static class DatabaseInitializer
 {
-    private static readonly ExpenseCategory[] DefaultCategories =
+    private static readonly ExpenseCategory[] _defaultCategories =
     [
         new ExpenseCategory { Id = 1, Name = "Alimentação" },
         new ExpenseCategory { Id = 2, Name = "Transporte" },
@@ -103,7 +103,7 @@ internal static class DatabaseInitializer
 
     private static async Task SeedCategoriesAsync(ExpenseHubDbContext dbContext)
     {
-        foreach (ExpenseCategory category in DefaultCategories)
+        foreach (ExpenseCategory category in _defaultCategories)
         {
             bool exists = await dbContext.ExpenseCategories.AnyAsync(
                 existing => existing.Id == category.Id || existing.Name == category.Name);

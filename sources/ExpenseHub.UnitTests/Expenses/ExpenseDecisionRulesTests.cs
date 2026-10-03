@@ -1,9 +1,9 @@
-namespace ExpenseHub.UnitTests.Expenses;
-
 using System;
 using System.Linq;
 using ExpenseHub.Api.Domain;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace ExpenseHub.UnitTests.Expenses;
 
 /// <summary>
 /// Tests the approval and rejection transitions.
@@ -15,7 +15,7 @@ public sealed class ExpenseDecisionRulesTests
     private const string ApproverId = "approver";
     private const string Reason = "Comprovante ilegível";
 
-    private static readonly DateTimeOffset DecidedAt = new DateTimeOffset(2026, 9, 5, 14, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _decidedAt = new DateTimeOffset(2026, 9, 5, 14, 0, 0, TimeSpan.Zero);
 
     /// <summary>An Approver approves another user's submitted expense and the transition is recorded.</summary>
     [TestMethod]
@@ -23,7 +23,7 @@ public sealed class ExpenseDecisionRulesTests
     {
         Expense expense = CreateExpense(ExpenseStatus.Submitted);
 
-        ExpenseDecisionOutcome outcome = ExpenseDecisionRules.Approve(expense, ApproverId, DecidedAt);
+        ExpenseDecisionOutcome outcome = ExpenseDecisionRules.Approve(expense, ApproverId, _decidedAt);
 
         Assert.AreEqual(ExpenseDecisionOutcome.Applied, outcome);
         Assert.AreEqual(ExpenseStatus.Approved, expense.Status);
@@ -32,7 +32,7 @@ public sealed class ExpenseDecisionRulesTests
         Assert.AreEqual(ExpenseHistoryActions.Approved, entry.Action);
         Assert.AreEqual(expense.Id, entry.ExpenseId);
         Assert.AreEqual(ApproverId, entry.ActorId);
-        Assert.AreEqual(DecidedAt, entry.OccurredAtUtc);
+        Assert.AreEqual(_decidedAt, entry.OccurredAtUtc);
         Assert.AreEqual(ExpenseStatus.Submitted, entry.PreviousStatus);
         Assert.AreEqual(ExpenseStatus.Approved, entry.NewStatus);
         Assert.IsNull(entry.RejectionReason);
@@ -44,7 +44,7 @@ public sealed class ExpenseDecisionRulesTests
     {
         Expense expense = CreateExpense(ExpenseStatus.Submitted);
 
-        ExpenseDecisionOutcome outcome = ExpenseDecisionRules.Reject(expense, ApproverId, Reason, DecidedAt);
+        ExpenseDecisionOutcome outcome = ExpenseDecisionRules.Reject(expense, ApproverId, Reason, _decidedAt);
 
         Assert.AreEqual(ExpenseDecisionOutcome.Applied, outcome);
         Assert.AreEqual(ExpenseStatus.Rejected, expense.Status);
@@ -52,7 +52,7 @@ public sealed class ExpenseDecisionRulesTests
         ExpenseHistory entry = expense.History.Single();
         Assert.AreEqual(ExpenseHistoryActions.Rejected, entry.Action);
         Assert.AreEqual(ApproverId, entry.ActorId);
-        Assert.AreEqual(DecidedAt, entry.OccurredAtUtc);
+        Assert.AreEqual(_decidedAt, entry.OccurredAtUtc);
         Assert.AreEqual(ExpenseStatus.Submitted, entry.PreviousStatus);
         Assert.AreEqual(ExpenseStatus.Rejected, entry.NewStatus);
         Assert.AreEqual(Reason, entry.RejectionReason);
@@ -67,10 +67,10 @@ public sealed class ExpenseDecisionRulesTests
 
         Assert.AreEqual(
             ExpenseDecisionOutcome.SelfDecision,
-            ExpenseDecisionRules.Approve(approveTarget, OwnerId, DecidedAt));
+            ExpenseDecisionRules.Approve(approveTarget, OwnerId, _decidedAt));
         Assert.AreEqual(
             ExpenseDecisionOutcome.SelfDecision,
-            ExpenseDecisionRules.Reject(rejectTarget, OwnerId, Reason, DecidedAt));
+            ExpenseDecisionRules.Reject(rejectTarget, OwnerId, Reason, _decidedAt));
         Assert.AreEqual(ExpenseStatus.Submitted, approveTarget.Status);
         Assert.AreEqual(ExpenseStatus.Submitted, rejectTarget.Status);
         Assert.IsEmpty(approveTarget.History);
@@ -91,10 +91,10 @@ public sealed class ExpenseDecisionRulesTests
 
         Assert.AreEqual(
             ExpenseDecisionOutcome.NotSubmitted,
-            ExpenseDecisionRules.Approve(approveTarget, ApproverId, DecidedAt));
+            ExpenseDecisionRules.Approve(approveTarget, ApproverId, _decidedAt));
         Assert.AreEqual(
             ExpenseDecisionOutcome.NotSubmitted,
-            ExpenseDecisionRules.Reject(rejectTarget, ApproverId, Reason, DecidedAt));
+            ExpenseDecisionRules.Reject(rejectTarget, ApproverId, Reason, _decidedAt));
         Assert.AreEqual((ExpenseStatus)status, approveTarget.Status);
         Assert.AreEqual((ExpenseStatus)status, rejectTarget.Status);
         Assert.IsEmpty(approveTarget.History);
@@ -106,9 +106,9 @@ public sealed class ExpenseDecisionRulesTests
     public void RepeatedApprovalDoesNotDuplicateHistory()
     {
         Expense expense = CreateExpense(ExpenseStatus.Submitted);
-        ExpenseDecisionRules.Approve(expense, ApproverId, DecidedAt);
+        ExpenseDecisionRules.Approve(expense, ApproverId, _decidedAt);
 
-        ExpenseDecisionOutcome outcome = ExpenseDecisionRules.Approve(expense, ApproverId, DecidedAt.AddMinutes(1));
+        ExpenseDecisionOutcome outcome = ExpenseDecisionRules.Approve(expense, ApproverId, _decidedAt.AddMinutes(1));
 
         Assert.AreEqual(ExpenseDecisionOutcome.NotSubmitted, outcome);
         Assert.HasCount(1, expense.History);
@@ -119,14 +119,14 @@ public sealed class ExpenseDecisionRulesTests
     public void RejectedIsFinal()
     {
         Expense expense = CreateExpense(ExpenseStatus.Submitted);
-        ExpenseDecisionRules.Reject(expense, ApproverId, Reason, DecidedAt);
+        ExpenseDecisionRules.Reject(expense, ApproverId, Reason, _decidedAt);
 
         Assert.AreEqual(
             ExpenseDecisionOutcome.NotSubmitted,
-            ExpenseDecisionRules.Reject(expense, ApproverId, Reason, DecidedAt.AddMinutes(1)));
+            ExpenseDecisionRules.Reject(expense, ApproverId, Reason, _decidedAt.AddMinutes(1)));
         Assert.AreEqual(
             ExpenseDecisionOutcome.NotSubmitted,
-            ExpenseDecisionRules.Approve(expense, ApproverId, DecidedAt.AddMinutes(2)));
+            ExpenseDecisionRules.Approve(expense, ApproverId, _decidedAt.AddMinutes(2)));
         Assert.AreEqual(ExpenseStatus.Rejected, expense.Status);
         Assert.HasCount(1, expense.History);
     }

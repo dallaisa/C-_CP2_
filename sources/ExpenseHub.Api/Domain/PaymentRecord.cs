@@ -1,6 +1,6 @@
-namespace ExpenseHub.Api.Domain;
-
 using System;
+
+namespace ExpenseHub.Api.Domain;
 
 /// <summary>
 /// Records payment of an expense.

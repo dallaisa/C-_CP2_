@@ -1,5 +1,3 @@
-namespace ExpenseHub.UnitTests.Expenses;
-
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -8,19 +6,21 @@ using ExpenseHub.Api.Domain;
 using ExpenseHub.Api.Expenses;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
+namespace ExpenseHub.UnitTests.Expenses;
+
 /// <summary>
 /// Tests the draft expense input contract.
 /// </summary>
 [TestClass]
 public sealed class ExpenseRequestValidatorTests
 {
-    private static readonly DateOnly Today = new DateOnly(2026, 9, 30);
+    private static readonly DateOnly _today = new DateOnly(2026, 9, 30);
 
     /// <summary>A request that respects every field rule is accepted.</summary>
     [TestMethod]
     public void ValidateAcceptsValidRequest()
     {
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(CreateRequest(), Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(CreateRequest(), _today);
 
         Assert.IsEmpty(errors);
     }
@@ -35,7 +35,7 @@ public sealed class ExpenseRequestValidatorTests
     {
         ExpenseRequest request = CreateRequest(description: new string('a', length));
 
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, _today);
 
         Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.Description)));
     }
@@ -49,7 +49,7 @@ public sealed class ExpenseRequestValidatorTests
     {
         ExpenseRequest request = CreateRequest(description: new string('a', length));
 
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, _today);
 
         Assert.IsEmpty(errors);
     }
@@ -60,7 +60,7 @@ public sealed class ExpenseRequestValidatorTests
     {
         ExpenseRequest request = CreateRequest(description: "   curta      ");
 
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, _today);
 
         Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.Description)));
     }
@@ -72,11 +72,11 @@ public sealed class ExpenseRequestValidatorTests
         ExpenseRequest request = new ExpenseRequest
         {
             Amount = 10m,
-            ExpenseDate = Today,
+            ExpenseDate = _today,
             CategoryId = 1,
         };
 
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, _today);
 
         Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.Description)));
     }
@@ -93,7 +93,7 @@ public sealed class ExpenseRequestValidatorTests
     {
         ExpenseRequest request = CreateRequest(amount: decimal.Parse(amount, CultureInfo.InvariantCulture));
 
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, _today);
 
         Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.Amount)));
     }
@@ -107,7 +107,7 @@ public sealed class ExpenseRequestValidatorTests
     {
         ExpenseRequest request = CreateRequest(amount: decimal.Parse(amount, CultureInfo.InvariantCulture));
 
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, _today);
 
         Assert.IsEmpty(errors);
     }
@@ -116,9 +116,9 @@ public sealed class ExpenseRequestValidatorTests
     [TestMethod]
     public void ValidateRejectsFutureDate()
     {
-        ExpenseRequest request = CreateRequest(expenseDate: Today.AddDays(1));
+        ExpenseRequest request = CreateRequest(expenseDate: _today.AddDays(1));
 
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, _today);
 
         Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.ExpenseDate)));
     }
@@ -128,7 +128,7 @@ public sealed class ExpenseRequestValidatorTests
     public void ValidateAcceptsTodayAsExpenseDate()
     {
         Dictionary<string, string[]> errors =
-            ExpenseRequestValidator.Validate(CreateRequest(expenseDate: Today), Today);
+            ExpenseRequestValidator.Validate(CreateRequest(expenseDate: _today), _today);
 
         Assert.IsEmpty(errors);
     }
@@ -142,7 +142,7 @@ public sealed class ExpenseRequestValidatorTests
     {
         ExpenseRequest request = CreateRequest(categoryId: categoryId == 0 ? null : categoryId);
 
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, _today);
 
         Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.CategoryId)));
     }
@@ -157,7 +157,7 @@ public sealed class ExpenseRequestValidatorTests
 
         Assert.AreEqual("Almoço com cliente", values.Description);
         Assert.AreEqual(150.75m, values.Amount);
-        Assert.AreEqual(Today, values.ExpenseDate);
+        Assert.AreEqual(_today, values.ExpenseDate);
         Assert.AreEqual(1, values.ExpenseCategoryId);
     }
 
@@ -167,7 +167,7 @@ public sealed class ExpenseRequestValidatorTests
     {
         ExpenseRequest request = CreateRequest(description: new string(' ', 20));
 
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, _today);
 
         Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.Description)));
     }
@@ -178,7 +178,7 @@ public sealed class ExpenseRequestValidatorTests
     {
         ExpenseRequest request = new ExpenseRequest { Description = "Almoço com cliente", CategoryId = 1 };
 
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, _today);
 
         Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.Amount)));
         Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.ExpenseDate)));
@@ -189,9 +189,9 @@ public sealed class ExpenseRequestValidatorTests
     [TestMethod]
     public void ValidateReportsEveryInvalidField()
     {
-        ExpenseRequest request = CreateRequest(description: "curta", amount: 0m, expenseDate: Today.AddDays(1), categoryId: 0);
+        ExpenseRequest request = CreateRequest(description: "curta", amount: 0m, expenseDate: _today.AddDays(1), categoryId: 0);
 
-        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, _today);
 
         CollectionAssert.AreEquivalent(
             new[]
@@ -223,7 +223,7 @@ public sealed class ExpenseRequestValidatorTests
         {
             Description = description,
             Amount = amount,
-            ExpenseDate = expenseDate ?? Today,
+            ExpenseDate = expenseDate ?? _today,
             CategoryId = categoryId,
         };
     }

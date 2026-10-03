@@ -1,10 +1,10 @@
-namespace ExpenseHub.Api.Expenses;
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using ExpenseHub.Api.Domain;
 using ExpenseHub.Api.Endpoints;
+
+namespace ExpenseHub.Api.Expenses;
 
 /// <summary>
 /// Validates draft expense requests against the ExpenseHub field contract.

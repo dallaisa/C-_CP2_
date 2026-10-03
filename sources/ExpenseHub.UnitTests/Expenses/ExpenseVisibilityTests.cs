@@ -1,10 +1,10 @@
-namespace ExpenseHub.UnitTests.Expenses;
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using ExpenseHub.Api.Domain;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace ExpenseHub.UnitTests.Expenses;
 
 /// <summary>
 /// Tests the expense visibility matrix for each profile.

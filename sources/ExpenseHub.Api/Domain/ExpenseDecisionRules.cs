@@ -1,6 +1,6 @@
-namespace ExpenseHub.Api.Domain;
-
 using System;
+
+namespace ExpenseHub.Api.Domain;
 
 /// <summary>
 /// Applies the approval and rejection transitions of submitted expenses.

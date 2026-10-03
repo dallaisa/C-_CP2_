@@ -1,6 +1,6 @@
-namespace ExpenseHub.Api.Domain;
-
 using System;
+
+namespace ExpenseHub.Api.Domain;
 
 /// <summary>
 /// Holds the already validated values that a client may set on a draft expense.

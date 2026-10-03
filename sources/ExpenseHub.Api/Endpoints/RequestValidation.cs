@@ -1,8 +1,8 @@
-namespace ExpenseHub.Api.Endpoints;
-
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+
+namespace ExpenseHub.Api.Endpoints;
 
 /// <summary>
 /// Validates request DTOs using their declarative data annotations.

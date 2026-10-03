@@ -1,7 +1,7 @@
-namespace ExpenseHub.Api.Expenses;
-
 using System;
 using ExpenseHub.Api.Domain;
+
+namespace ExpenseHub.Api.Expenses;
 
 /// <summary>
 /// Represents an expense returned by the API.

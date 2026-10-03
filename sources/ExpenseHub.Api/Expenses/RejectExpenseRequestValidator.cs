@@ -1,8 +1,8 @@
-namespace ExpenseHub.Api.Expenses;
-
 using System;
 using System.Collections.Generic;
 using ExpenseHub.Api.Endpoints;
+
+namespace ExpenseHub.Api.Expenses;
 
 /// <summary>
 /// Validates rejection requests against the justification contract.

@@ -1,5 +1,3 @@
-namespace ExpenseHub.Api.Expenses;
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,6 +6,8 @@ using System.Threading.Tasks;
 using ExpenseHub.Api.Domain;
 using ExpenseHub.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
+
+namespace ExpenseHub.Api.Expenses;
 
 /// <summary>
 /// Applies ownership, state, visibility and validation rules to expense operations.
@@ -26,7 +26,7 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
 
     private const string PayConflictMessage = "Only expenses in Approved can be paid.";
 
-    private static readonly string[] InvalidCategoryErrors = new[] { "CategoryId must be a valid category." };
+    private static readonly string[] _invalidCategoryErrors = new[] { "CategoryId must be a valid category." };
 
     /// <summary>Creates a draft expense owned by the authenticated user.</summary>
     /// <param name="actor">The authenticated user, who becomes the owner.</param>
@@ -343,7 +343,7 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
     private static ExpenseOperationResult InvalidCategory() =>
         ExpenseOperationResult.Invalid(new Dictionary<string, string[]>
         {
-            [nameof(ExpenseRequest.CategoryId)] = InvalidCategoryErrors,
+            [nameof(ExpenseRequest.CategoryId)] = _invalidCategoryErrors,
         });
 
     private static async Task<ExpenseOperationResult> DecideAsync(
