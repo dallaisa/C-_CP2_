@@ -47,11 +47,17 @@ internal static class ExpenseEndpoints
         endpoints.MapPost("/api/expenses/{id:guid}/reject", RejectAsync)
             .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Approver));
 
+        endpoints.MapPost("/api/expenses/{id:guid}/pay", PayAsync)
+            .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Finance));
+
         // Admin is intentionally absent: it grants no functional access to expenses.
         endpoints.MapGet("/api/expenses", ListAsync)
             .RequireAuthorization(policy => policy.RequireRole(ReaderRoles));
 
         endpoints.MapGet("/api/expenses/{id:guid}", GetByIdAsync)
+            .RequireAuthorization(policy => policy.RequireRole(ReaderRoles));
+
+        endpoints.MapGet("/api/expenses/{id:guid}/history", GetHistoryAsync)
             .RequireAuthorization(policy => policy.RequireRole(ReaderRoles));
 
         return endpoints;
@@ -166,6 +172,24 @@ internal static class ExpenseEndpoints
         return ToResponse(result);
     }
 
+    private static async Task<IResult> PayAsync(
+        Guid id,
+        ClaimsPrincipal principal,
+        ExpenseService expenseService,
+        CancellationToken cancellationToken)
+    {
+        ExpenseViewer? actor = CreateViewer(principal);
+        if (actor is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        ExpenseOperationResult result =
+            await expenseService.PayAsync(id, actor, cancellationToken);
+
+        return ToResponse(result);
+    }
+
     private static async Task<IResult> ListAsync(
         ClaimsPrincipal principal,
         ExpenseService expenseService,
@@ -198,6 +222,25 @@ internal static class ExpenseEndpoints
         return expense is null
             ? ToProblem(ExpenseOperationResult.NotFound())
             : Results.Ok(ExpenseResponse.FromExpense(expense));
+    }
+
+    private static async Task<IResult> GetHistoryAsync(
+        Guid id,
+        ClaimsPrincipal principal,
+        ExpenseService expenseService,
+        CancellationToken cancellationToken)
+    {
+        ExpenseViewer? viewer = CreateViewer(principal);
+        if (viewer is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        // A missing expense and one outside the viewer's scope produce the same response.
+        List<ExpenseHistory>? history = await expenseService.ListHistoryAsync(id, viewer, cancellationToken);
+        return history is null
+            ? ToProblem(ExpenseOperationResult.NotFound())
+            : Results.Ok(history.Select(ExpenseHistoryResponse.FromHistory).ToList());
     }
 
     private static ExpenseViewer? CreateViewer(ClaimsPrincipal principal)

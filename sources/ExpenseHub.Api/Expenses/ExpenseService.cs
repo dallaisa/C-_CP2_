@@ -24,6 +24,8 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
 
     private const string RejectConflictMessage = "Only expenses in Submitted can be rejected.";
 
+    private const string PayConflictMessage = "Only expenses in Approved can be paid.";
+
     private static readonly string[] InvalidCategoryErrors = new[] { "CategoryId must be a valid category." };
 
     /// <summary>Creates a draft expense owned by the authenticated user.</summary>
@@ -224,6 +226,80 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
             cancellationToken);
     }
 
+    /// <summary>Pays an approved expense owned by another user.</summary>
+    /// <param name="expenseId">The identifier of the expense to pay.</param>
+    /// <param name="actor">The authenticated Finance user.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The operation result.</returns>
+    internal async Task<ExpenseOperationResult> PayAsync(
+        Guid expenseId,
+        ExpenseViewer actor,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        Expense? expense = await dbContext.Expenses
+            .Include(item => item.Category)
+            .Include(item => item.Payment)
+            .FirstOrDefaultAsync(item => item.Id == expenseId, cancellationToken);
+
+        // Role, ownership and state are checked before anything changes.
+        ExpenseAccessDecision decision = ExpenseAccessPolicy.EvaluatePayment(actor, expense);
+        if (decision != ExpenseAccessDecision.Allowed)
+        {
+            return FromDecision(decision, PayConflictMessage);
+        }
+
+        ExpensePaymentOutcome outcome = ExpensePaymentRules.Pay(expense!, actor.UserId, timeProvider.GetUtcNow());
+        if (outcome == ExpensePaymentOutcome.SelfPayment)
+        {
+            return ExpenseOperationResult.Forbidden();
+        }
+
+        if (outcome == ExpensePaymentOutcome.NotApproved)
+        {
+            return ExpenseOperationResult.Conflict(PayConflictMessage);
+        }
+
+        // The new status, the payment record and the history entry are saved by the same SaveChanges
+        // call. A concurrent payment changes the status first, so this update matches no row and
+        // nothing from this request is saved.
+        if (!await TrySaveAsync(dbContext, cancellationToken))
+        {
+            return ExpenseOperationResult.Conflict(PayConflictMessage);
+        }
+
+        return ExpenseOperationResult.Success(expense!);
+    }
+
+    /// <summary>Lists the history of an expense visible to the authenticated user.</summary>
+    /// <param name="expenseId">The identifier of the expense.</param>
+    /// <param name="viewer">The authenticated viewer.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The history in the order it was recorded, or <see langword="null"/> when the expense is not visible.</returns>
+    internal async Task<List<ExpenseHistory>?> ListHistoryAsync(
+        Guid expenseId,
+        ExpenseViewer viewer,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(viewer);
+
+        // The history has exactly the same visibility as the expense, checked in the database.
+        bool isVisible = await dbContext.Expenses
+            .Where(ExpenseVisibility.VisibleTo(viewer))
+            .AnyAsync(expense => expense.Id == expenseId, cancellationToken);
+        if (!isVisible)
+        {
+            return null;
+        }
+
+        return await dbContext.ExpenseHistories
+            .AsNoTracking()
+            .Where(entry => entry.ExpenseId == expenseId)
+            .OrderBy(entry => entry.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     /// <summary>Lists the expenses visible to the authenticated user.</summary>
     /// <param name="viewer">The authenticated viewer.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
@@ -238,6 +314,7 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
             .AsNoTracking()
             .Where(ExpenseVisibility.VisibleTo(viewer))
             .Include(expense => expense.Category)
+            .Include(expense => expense.Payment)
             .OrderByDescending(expense => expense.ExpenseDate)
             .ThenBy(expense => expense.Id)
             .ToListAsync(cancellationToken);
@@ -259,6 +336,7 @@ internal sealed class ExpenseService(ExpenseHubDbContext dbContext, TimeProvider
             .AsNoTracking()
             .Where(ExpenseVisibility.VisibleTo(viewer))
             .Include(expense => expense.Category)
+            .Include(expense => expense.Payment)
             .FirstOrDefaultAsync(expense => expense.Id == expenseId, cancellationToken);
     }
 

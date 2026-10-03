@@ -154,18 +154,25 @@ public sealed class ExpenseAccessPolicyTests
         Assert.AreEqual(ExpenseAccessDecision.Conflict, decision);
     }
 
-    /// <summary>Expenses outside the Finance scope are reported as missing.</summary>
+    /// <summary>Expenses that are not Approved cannot be paid.</summary>
     /// <param name="status">The numeric value of the current status.</param>
     [TestMethod]
     [DataRow((int)ExpenseStatus.Draft)]
     [DataRow((int)ExpenseStatus.Submitted)]
     [DataRow((int)ExpenseStatus.Rejected)]
-    public void FinanceDoesNotSeeExpensesBeforeApproval(int status)
+    public void PaymentOutsideApprovedIsConflict(int status)
     {
         ExpenseAccessDecision decision =
             ExpenseAccessPolicy.EvaluatePayment(Finance(), CreateExpense(OtherId, (ExpenseStatus)status));
 
-        Assert.AreEqual(ExpenseAccessDecision.NotFound, decision);
+        Assert.AreEqual(ExpenseAccessDecision.Conflict, decision);
+    }
+
+    /// <summary>A payment on a missing expense is reported as missing.</summary>
+    [TestMethod]
+    public void PaymentOnMissingExpenseIsNotFound()
+    {
+        Assert.AreEqual(ExpenseAccessDecision.NotFound, ExpenseAccessPolicy.EvaluatePayment(Finance(), null));
     }
 
     /// <summary>An Auditor reads everything but performs no write operation.</summary>

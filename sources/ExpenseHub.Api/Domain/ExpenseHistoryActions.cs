@@ -19,4 +19,7 @@ internal static class ExpenseHistoryActions
 
     /// <summary>Gets the action recorded when a submitted expense is rejected.</summary>
     internal const string Rejected = "Rejected";
+
+    /// <summary>Gets the action recorded when an approved expense is paid.</summary>
+    internal const string Paid = "Paid";
 }

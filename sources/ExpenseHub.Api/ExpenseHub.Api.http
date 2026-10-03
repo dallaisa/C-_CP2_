@@ -358,3 +358,49 @@ Authorization: Bearer {{approverAccessToken}}
 # Users without the Approver role cannot decide: 403.
 POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{submittedExpenseId}}/approve
 Authorization: Bearer {{employeeAccessToken}}
+
+###
+
+# I08 — Set @approvedExpenseId to an Approved expense owned by another user.
+@approvedExpenseId = REPLACE_WITH_APPROVED_EXPENSE_ID
+@ownApprovedExpenseId = REPLACE_WITH_FINANCE_OWN_APPROVED_EXPENSE_ID
+
+# Finance pays another user's Approved expense: 200, status Paid and a payment record. There is no request body.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{approvedExpenseId}}/pay
+Authorization: Bearer {{financeAccessToken}}
+
+###
+
+# Paying again returns 409 and creates no new payment record or history entry.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{approvedExpenseId}}/pay
+Authorization: Bearer {{financeAccessToken}}
+
+###
+
+# The owner cannot pay their own expense, even with Employee and Finance roles: 403.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{ownApprovedExpenseId}}/pay
+Authorization: Bearer {{financeAccessToken}}
+
+###
+
+# Users without the Finance role cannot pay: 403.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{approvedExpenseId}}/pay
+Authorization: Bearer {{auditorAccessToken}}
+
+###
+
+# The owner reads the full history of their expense: 200.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{approvedExpenseId}}/history
+Authorization: Bearer {{employeeAccessToken}}
+
+###
+
+# The Auditor reads any history: 200.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{approvedExpenseId}}/history
+Authorization: Bearer {{auditorAccessToken}}
+
+###
+
+# Another Employee cannot read the history: 404.
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{approvedExpenseId}}/history
+Authorization: Bearer {{otherEmployeeAccessToken}}

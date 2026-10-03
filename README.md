@@ -1,4 +1,4 @@
-# ExpenseHub — I01 a I07
+# ExpenseHub — I01 a I08
 
 Versão preparada para concluir:
 
@@ -9,6 +9,7 @@ Versão preparada para concluir:
 - **I05 — Enviar, listar e consultar**
 - **I06 — Ownership e matriz de acesso**
 - **I07 — Aprovar e reprovar com justificativa**
+- **I08 — Pagamento e histórico**
 
 ## I01 implementada
 
@@ -151,7 +152,7 @@ Detalhes:
 - leitura e listagem usam `ExpenseVisibility`, traduzida para o `WHERE` antes da materialização;
 - `ExpenseAccessPolicy.EvaluateApprovalDecision` e `EvaluatePayment` implementam as proibições de
   autoaprovação e autopagamento, inclusive com roles acumuladas; aprovar e reprovar usam essas regras desde a I07,
-  e o endpoint de pagar pertence à I08;
+  e pagar desde a I08;
 - Admin não recebe acesso funcional aos reembolsos.
 
 ### Matriz aplicada
@@ -168,7 +169,7 @@ Detalhes:
 | Listar reembolsos | próprios | `Submitted` | `Approved`/`Paid` | todos | não | Filtro no SQL; roles somam | I05 |
 | Consultar detalhe | próprio | `Submitted` | `Approved`/`Paid` | todos | não | Fora do escopo → `404` | I05 |
 | Aprovar/Reprovar | não | sim | não | não | não | Não proprietário → senão `403`; `Submitted` → senão `409` | I06/I07 |
-| Pagar | não | não | sim | não | não | Não proprietário → senão `403`; `Approved` → senão `409` | Regra: I06 · Rota: I08 |
+| Pagar | não | não | sim | não | não | Não proprietário → senão `403`; `Approved` → senão `409` | I06/I08 |
 | Consultar histórico | próprio | visível | visível | todos | não | Mesma visibilidade do reembolso | I08 |
 
 `*` A permissão existe apenas se o usuário também possuir `Employee`.
@@ -183,7 +184,7 @@ Detalhes:
 | Reembolso inexistente, de outro Employee ou fora do escopo | `404` |
 | Transição fora do estado esperado | `409` |
 | Aprovar/reprovar reembolso fora de `Submitted` (`Draft`, `Approved`, `Rejected`, `Paid`) | `409` |
-| Pagar reembolso ainda não aprovado (`Draft`, `Submitted`, `Rejected`) | `404` (fora do escopo do Finance) |
+| Pagar reembolso fora de `Approved` (`Draft`, `Submitted`, `Rejected`, `Paid`) | `409` |
 
 ## I07 implementada
 
@@ -211,6 +212,45 @@ Detalhes:
 | Approver decidindo sobre reembolso próprio | `403 Forbidden` |
 | Reembolso inexistente | `404 Not Found` |
 | Reembolso fora de `Submitted` ou decisão repetida | `409 Conflict` |
+
+## I08 implementada
+
+- `POST /api/expenses/{id}/pay` executa `Approved → Paid`, restrito à role `Finance`; não recebe corpo;
+- somente Finance **não proprietário** paga; o proprietário recebe `403` mesmo acumulando `Employee` e `Finance`;
+- o pagamento cria um `PaymentRecord` com o ator do token e o instante UTC do servidor;
+- `Paid` é final: não há estorno, nova decisão, edição ou novo pagamento;
+- pagar fora de `Approved` (`Draft`, `Submitted`, `Rejected`, `Paid`) retorna `409` sem gravar nada;
+- o novo estado, o `PaymentRecord` e o histórico `Paid` são gravados na mesma chamada de `SaveChanges`
+  (uma transação); o `UPDATE` só é aplicado se o estado no banco ainda for `Approved`, então dois pagamentos
+  simultâneos resultam em um `200` e um `409`, com um único registro de pagamento e de histórico;
+- a resposta do reembolso passa a incluir `paidByUserId` e `paidAtUtc` quando ele estiver pago;
+- `GET /api/expenses/{id}/history` retorna o histórico em ordem de registro, com a **mesma visibilidade** do
+  reembolso (verificada no banco); fora do escopo ou inexistente → `404`;
+- cada entrada traz ação, reembolso, ator, instante UTC, estado anterior, estado posterior, justificativa
+  (reprovação) e campos alterados (edição em `Draft`).
+
+### Ações registradas no histórico
+
+| Ação | Estado anterior → posterior | Origem |
+|---|---|---|
+| `Created` | — → `Draft` | I04 |
+| `Updated` | `Draft` → `Draft` (com `changes`) | I04 |
+| `Submitted` | `Draft` → `Submitted` | I05 |
+| `Approved` | `Submitted` → `Approved` | I07 |
+| `Rejected` | `Submitted` → `Rejected` (com `rejectionReason`) | I07 |
+| `Paid` | `Approved` → `Paid` | I08 |
+
+### Respostas da I08
+
+| Situação | Status |
+|---|---|
+| Pagamento válido / histórico visível | `200 OK` |
+| Sem token | `401 Unauthorized` |
+| Pagamento sem role `Finance` (Employee, Approver, Auditor, Admin, sem role) | `403 Forbidden` |
+| Histórico sem `Employee`, `Approver`, `Finance` ou `Auditor` | `403 Forbidden` |
+| Finance pagando reembolso próprio | `403 Forbidden` |
+| Reembolso inexistente; histórico fora do escopo | `404 Not Found` |
+| Pagamento fora de `Approved` ou repetido | `409 Conflict` |
 
 ## Banco de dados
 
@@ -480,7 +520,7 @@ Crie usuários com as roles `Employee`, `Approver`, `Finance`, `Auditor`, `Emplo
 - envio repetido, envio de `Approved`/`Paid` e edição de `Submitted`: `409`;
 - Approver lendo `Draft`/`Approved` e Finance lendo `Draft`/`Submitted`: `404`;
 - roles acumuladas recebem a união das permissões de leitura;
-- autoaprovação: `403` (validada por HTTP a partir da I07); autopagamento: `403`, coberto por testes unitários até a rota da I08.
+- autoaprovação: `403` (validada por HTTP a partir da I07); autopagamento: `403` (validado por HTTP a partir da I08).
 
 ## Validar I07
 
@@ -513,6 +553,35 @@ Content-Type: application/json
 - reenviar ou editar `Rejected`: `409`;
 - reembolso inexistente: `404`;
 - histórico com um único registro por decisão, inclusive com duas aprovações simultâneas.
+
+## Validar I08
+
+```http
+POST /api/expenses/{id}/pay
+Authorization: Bearer <FinanceToken>
+```
+
+```http
+GET /api/expenses/{id}/history
+Authorization: Bearer <Token>
+```
+
+### Casos validados (fluxo completo por HTTP)
+
+- Employee cria, edita e envia; Approver aprova; Finance paga: `200`, estado `Paid`, `PaymentRecord` criado;
+- histórico do reembolso pago: `Created`, `Updated` (com `changes`), `Submitted`, `Approved`, `Paid`;
+- histórico do reembolso reprovado traz a justificativa;
+- campos `actorId`, `paidAtUtc`, `status` e `ownerId` enviados no corpo são ignorados;
+- repetir o pagamento (mesmo ou outro Finance): `409`, sem novo registro;
+- Employee + Finance pagando o próprio reembolso: `403`;
+- pagar `Draft`, `Submitted`, `Rejected` ou `Paid`: `409`;
+- Employee, Approver, Auditor, Admin e usuário sem role pagando: `403`;
+- editar ou reprovar um `Paid`: `409`;
+- dois pagamentos simultâneos: um `200` e um `409`, com um único `PaymentRecord` e um único histórico `Paid`;
+- nenhum reembolso `Paid` sem `PaymentRecord` ou sem histórico correspondente;
+- Employee consulta histórico próprio (`200`) e não consulta alheio (`404`);
+- Auditor consulta qualquer histórico; Approver só de `Submitted`; Finance só de `Approved`/`Paid`;
+- Admin ou usuário sem role: `403`; sem token: `401`; inexistente: `404`.
 
 ## Qualidade e segurança
 
@@ -607,6 +676,14 @@ referência: Racass/checkpoint-csharpracass-expensehub#6
 branch: i07-approve-reject
 PR: I07 — Aprovar e reprovar com justificativa
 referência: Racass/checkpoint-csharpracass-expensehub#7
+```
+
+### I08
+
+```text
+branch: i08-payment-history
+PR: I08 — Pagamento e histórico
+referência: Racass/checkpoint-csharpracass-expensehub#8
 ```
 
 Não use `Closes`, `Fixes` ou `Resolves` nas referências ao backlog central.
