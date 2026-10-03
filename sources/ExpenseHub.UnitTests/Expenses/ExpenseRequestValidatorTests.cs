@@ -3,6 +3,7 @@ namespace ExpenseHub.UnitTests.Expenses;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using ExpenseHub.Api.Domain;
 using ExpenseHub.Api.Expenses;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -158,6 +159,58 @@ public sealed class ExpenseRequestValidatorTests
         Assert.AreEqual(150.75m, values.Amount);
         Assert.AreEqual(Today, values.ExpenseDate);
         Assert.AreEqual(1, values.ExpenseCategoryId);
+    }
+
+    /// <summary>A description made only of spaces is rejected.</summary>
+    [TestMethod]
+    public void ValidateRejectsWhitespaceOnlyDescription()
+    {
+        ExpenseRequest request = CreateRequest(description: new string(' ', 20));
+
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+
+        Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.Description)));
+    }
+
+    /// <summary>Missing amount and expense date are rejected, each under its own field.</summary>
+    [TestMethod]
+    public void ValidateRejectsMissingAmountAndDate()
+    {
+        ExpenseRequest request = new ExpenseRequest { Description = "Almoço com cliente", CategoryId = 1 };
+
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+
+        Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.Amount)));
+        Assert.IsTrue(errors.ContainsKey(nameof(ExpenseRequest.ExpenseDate)));
+        Assert.IsFalse(errors.ContainsKey(nameof(ExpenseRequest.Description)));
+    }
+
+    /// <summary>Several invalid fields are reported together, so the client can fix all of them at once.</summary>
+    [TestMethod]
+    public void ValidateReportsEveryInvalidField()
+    {
+        ExpenseRequest request = CreateRequest(description: "curta", amount: 0m, expenseDate: Today.AddDays(1), categoryId: 0);
+
+        Dictionary<string, string[]> errors = ExpenseRequestValidator.Validate(request, Today);
+
+        CollectionAssert.AreEquivalent(
+            new[]
+            {
+                nameof(ExpenseRequest.Description),
+                nameof(ExpenseRequest.Amount),
+                nameof(ExpenseRequest.ExpenseDate),
+                nameof(ExpenseRequest.CategoryId),
+            },
+            errors.Keys.ToArray());
+    }
+
+    /// <summary>A request that was not validated cannot be converted into draft values.</summary>
+    [TestMethod]
+    public void ToDraftValuesRejectsUnvalidatedRequest()
+    {
+        ExpenseRequest request = new ExpenseRequest { Description = "Almoço com cliente" };
+
+        Assert.ThrowsExactly<ArgumentException>(() => ExpenseRequestValidator.ToDraftValues(request));
     }
 
     private static ExpenseRequest CreateRequest(

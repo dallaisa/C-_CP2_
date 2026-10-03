@@ -87,6 +87,29 @@ public sealed class ExpenseHistoryFlowTests
         Assert.AreEqual("Jantar com cliente", (string?)response.Changes["description"]?["to"]);
     }
 
+    /// <summary>Every action records the instant in UTC, even when the server clock has a local offset.</summary>
+    [TestMethod]
+    public void EveryActionRecordsInstantInUtc()
+    {
+        DateTimeOffset localClock = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.FromHours(-3));
+
+        Expense expense = ExpenseDraftRules.CreateDraft(EmployeeId, CreateValues("Almoço com cliente"), localClock);
+        ExpenseDraftRules.EditDraft(expense, EmployeeId, CreateValues("Jantar com cliente"), localClock);
+        ExpenseDraftRules.Submit(expense, EmployeeId, localClock);
+        ExpenseDecisionRules.Approve(expense, ApproverId, localClock);
+        ExpensePaymentRules.Pay(expense, FinanceId, localClock);
+
+        Assert.HasCount(5, expense.History);
+        foreach (ExpenseHistory entry in expense.History)
+        {
+            Assert.AreEqual(TimeSpan.Zero, entry.OccurredAtUtc.Offset);
+            Assert.AreEqual(localClock.UtcDateTime, entry.OccurredAtUtc.UtcDateTime);
+        }
+
+        Assert.AreEqual(TimeSpan.Zero, expense.Payment!.PaidAtUtc.Offset);
+        Assert.AreEqual(localClock.UtcDateTime, expense.Payment.PaidAtUtc.UtcDateTime);
+    }
+
     private static ExpenseDraftValues CreateValues(string description) =>
         new ExpenseDraftValues
         {
