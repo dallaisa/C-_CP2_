@@ -215,13 +215,14 @@ public sealed class ReportHttpTests
         }
     }
 
-    private static async Task<WebApplication> CreateAppAsync()
+    internal static async Task<WebApplication> CreateAppAsync(
+        IReportPublisher? publisher = null, MemoryReportStore? store = null)
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
         builder.Services.AddLogging(logging => logging.ClearProviders());
-        builder.Services.AddSingleton<IReportStore, MemoryReportStore>();
-        builder.Services.AddSingleton<IReportPublisher, UnavailableReportPublisher>();
+        builder.Services.AddSingleton<IReportStore>(store ?? new MemoryReportStore());
+        builder.Services.AddSingleton<IReportPublisher>(publisher ?? new UnavailableReportPublisher());
         builder.Services.AddSingleton<TimeProvider, ReportTestClock>();
         builder.Services.AddAuthentication("test").AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>("test", _ => { });
         builder.Services.AddAuthorization();
