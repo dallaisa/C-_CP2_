@@ -345,8 +345,10 @@ O projeto não usa migrations. Na inicialização, `DatabaseInitializer` executa
 Com `dotnet run --project ./sources/ExpenseHub.Api/ExpenseHub.Api.csproj`, o arquivo é criado em
 `sources/ExpenseHub.Api/expensehub.db`.
 
-`EnsureCreatedAsync` não altera um banco que já existe. Se o modelo mudar, recrie o banco local apagando
-`expensehub.db`, `expensehub.db-shm` e `expensehub.db-wal` e iniciando a aplicação novamente. Os dados locais são perdidos.
+`EnsureCreatedAsync` não altera um banco que já existe. Na CP3-I01, `ReportSchemaInitializer`
+executa uma atualização aditiva e idempotente após essa chamada: cria somente a tabela `Reports`
+e seu índice por solicitante quando ausentes. Os dados da CP2 são preservados, sem apagar ou recriar
+o arquivo SQLite. Mudanças futuras de esquema precisam de atualização explícita compatível.
 
 Os arquivos locais do SQLite não devem ser versionados:
 
@@ -791,3 +793,26 @@ referência: Racass/checkpoint-csharpracass-expensehub#10
 ```
 
 Não use `Closes`, `Fixes` ou `Resolves` nas referências ao backlog central.
+
+
+## CP3-I01 — Relatórios de reembolsos
+
+Implementação da [issue oficial CP3-I01](https://github.com/Racass/checkpoint-csharpracass-expensehub/issues/11).
+O contrato completo, estados, respostas, Excel e passos de integração com o worker estão em
+[docs/CP3-I01-RELATORIOS.md](docs/CP3-I01-RELATORIOS.md).
+
+- `POST /api/reports`: recebe somente `fromDate`, `toDate`, `scope`; persiste `Pending`.
+- `GET /api/reports`: lista apenas solicitações criadas pelo usuário autenticado.
+- `GET /api/reports/{id}`: consulta andamento e resultado salvo de uma solicitação própria.
+- `GET /api/reports/{id}/excel`: baixa XLSX real, com valores numéricos, baseado no resultado salvo.
+- `Employee` pode solicitar `Mine`; `Auditor` pode solicitar `Global`; roles acumuladas permitem ambos.
+- O cálculo considera `ExpenseDate` inclusiva, valores `decimal`, os cinco estados e totais, inclusive zeros.
+- O resultado e seu `generatedAt` são persistidos; consultas e downloads não recalculam despesas.
+
+**Integração I03 pendente:** o publicador padrão informa ausência de confirmação. Por isso, o POST
+retorna provisoriamente `201` sem `Location`, indicando somente que a solicitação foi persistida.
+Nenhum processamento é disparado pela API. `202` e `Location` só são emitidos se um publicador real
+retornar confirmação do broker. Não existe RabbitMQ, worker automático ou confirmação simulada nesta issue.
+
+Os testes de relatórios usam fakes e transporte HTTP em memória, sem banco, rede ou broker reais.
+O SDK Open XML (licença MIT) gera a planilha e valida sua estrutura nos testes.
