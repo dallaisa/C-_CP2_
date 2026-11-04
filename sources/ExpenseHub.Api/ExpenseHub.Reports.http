@@ -1,0 +1,95 @@
+@ExpenseHub_Api_HostAddress = http://localhost:8080
+
+# Cole os tokens apenas localmente. Nunca versione valores reais.
+@employeeToken = REPLACE_WITH_EMPLOYEE_ACCESS_TOKEN
+@auditorToken = REPLACE_WITH_AUDITOR_ACCESS_TOKEN
+@reportId = REPLACE_WITH_REPORT_ID
+
+# Login (a resposta traz accessToken). Use contas com as roles Employee e Auditor.
+POST {{ExpenseHub_Api_HostAddress}}/login
+Content-Type: application/json
+
+{
+	"email": "employee@example.com",
+	"password": "REPLACE_WITH_PASSWORD"
+}
+
+###
+
+# Solicitar relatorio Mine (Employee). Esperado: 202, Location e envelope Pending.
+# Sem confirmacao do broker: 503 com o id persistido.
+POST {{ExpenseHub_Api_HostAddress}}/api/reports
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+	"fromDate": "2026-09-01",
+	"toDate": "2026-09-30",
+	"scope": "Mine"
+}
+
+###
+
+# Employee solicitando Global. Esperado: 403.
+POST {{ExpenseHub_Api_HostAddress}}/api/reports
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+	"fromDate": "2026-09-01",
+	"toDate": "2026-09-30",
+	"scope": "Global"
+}
+
+###
+
+# Auditor solicitando Global. Esperado: 202 (ou 503 sem confirmacao).
+POST {{ExpenseHub_Api_HostAddress}}/api/reports
+Authorization: Bearer {{auditorToken}}
+Content-Type: application/json
+
+{
+	"fromDate": "2026-09-01",
+	"toDate": "2026-09-30",
+	"scope": "Global"
+}
+
+###
+
+# Periodo invertido. Esperado: 400, nada persistido.
+POST {{ExpenseHub_Api_HostAddress}}/api/reports
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+	"fromDate": "2026-09-30",
+	"toDate": "2026-09-01",
+	"scope": "Mine"
+}
+
+###
+
+# Sem autenticacao. Esperado: 401.
+GET {{ExpenseHub_Api_HostAddress}}/api/reports
+
+###
+
+# Listar somente as solicitacoes do usuario autenticado.
+GET {{ExpenseHub_Api_HostAddress}}/api/reports
+Authorization: Bearer {{employeeToken}}
+Accept: application/json
+
+###
+
+# Detalhe: Pending -> Processing -> Completed (ou Failed). Alheio ou inexistente: 404.
+GET {{ExpenseHub_Api_HostAddress}}/api/reports/{{reportId}}
+Authorization: Bearer {{employeeToken}}
+Accept: application/json
+
+###
+
+# Excel do resultado salvo. Completed: 200 (.xlsx). Proprio nao concluido: 409. Alheio: 404.
+GET {{ExpenseHub_Api_HostAddress}}/api/reports/{{reportId}}/excel
+Authorization: Bearer {{employeeToken}}
+
+###

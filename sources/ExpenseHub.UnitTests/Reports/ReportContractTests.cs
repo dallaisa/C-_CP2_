@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -173,6 +174,29 @@ public sealed class ReportContractTests
         Assert.AreEqual(ReportStatus.Completed, report.Status);
     }
 
+    /// <summary>A duplicate delivery is logged with the report ID so the experiment can be correlated.</summary>
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task DuplicateDeliveryIsLoggedWithReportId(bool failed)
+    {
+        MemoryReportStore store = new MemoryReportStore { ThrowOnRead = failed };
+        Report report = MemoryReportStore.Pending();
+        store.Reports.Add(report);
+        CapturingLogger<ReportProcessor> logger = new CapturingLogger<ReportProcessor>();
+        ReportProcessor processor = new ReportProcessor(
+            store, new ReportCalculator(new ReportTestClock()), new ReportTestClock(), logger);
+        await processor.ProcessAsync(report.Id, CancellationToken.None);
+        logger.Messages.Clear();
+
+        await processor.ProcessAsync(report.Id, CancellationToken.None);
+
+        string message = logger.Messages.Single();
+        Assert.Contains(report.Id.ToString(), message, StringComparison.Ordinal);
+        Assert.Contains("duplicate delivery ignored", message, StringComparison.Ordinal);
+        Assert.Contains(failed ? "Failed" : "Completed", message, StringComparison.Ordinal);
+    }
+
     /// <summary>The worker computes from the saved scope and requester: Mine ignores others, Global includes them.</summary>
     [TestMethod]
     [DataRow("Mine", "10.5", 1)]
@@ -287,4 +311,19 @@ public sealed class ReportContractTests
 
     private static ReportProcessor Processor(MemoryReportStore store) => new ReportProcessor(
         store, new ReportCalculator(new ReportTestClock()), new ReportTestClock(), NullLogger<ReportProcessor>.Instance);
+}
+
+internal sealed class CapturingLogger<T> : Microsoft.Extensions.Logging.ILogger<T>
+{
+    internal List<string> Messages { get; } = [];
+
+    public IDisposable? BeginScope<TState>(TState state)
+        where TState : notnull => null;
+
+    public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+    public void Log<TState>(
+        Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId,
+        TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        => Messages.Add(formatter(state, exception));
 }
