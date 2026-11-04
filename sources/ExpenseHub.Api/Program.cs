@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using ExpenseHub.Api.Endpoints;
 using ExpenseHub.Api.Expenses;
+using ExpenseHub.Api.Hosting;
 using ExpenseHub.Api.Identity;
 using ExpenseHub.Api.Messaging;
 using ExpenseHub.Api.Persistence;
@@ -32,6 +33,7 @@ internal static class Program
         string connectionString = builder.Configuration.GetConnectionString("ExpenseHub")
             ?? "Data Source=expensehub.db";
 
+        builder.Services.AddExpenseHubDataProtection(builder.Configuration);
         builder.Services.AddOpenApi();
         builder.Services.AddProblemDetails();
         builder.Services.AddSingleton(TimeProvider.System);
