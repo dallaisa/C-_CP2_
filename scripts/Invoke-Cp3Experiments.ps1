@@ -219,11 +219,13 @@ function Invoke-E01 {
     $approved = $result.byStatus | Where-Object { $_.status -eq "Approved" }; $paid = $result.byStatus | Where-Object { $_.status -eq "Paid" }
     Test-Check $name "Approved 2 / 150 e Paid 1 / 25" ($approved.count -eq 2 -and [decimal]$approved.amount -eq 150 -and $paid.count -eq 1 -and [decimal]$paid.amount -eq 25) ""
     Test-Check $name "Cinco estados presentes" (@($result.byStatus).Count -eq 5) ""
-    $file = Join-Path $OutputDirectory "report-$id.xlsx"
+    # A planilha fica fora do repositorio (arquivo temporario) para nao versionar binarios; so o resultado da conferencia entra nas evidencias.
+    $file = Join-Path ([System.IO.Path]::GetTempPath()) "cp3-report-$id.xlsx"
     $excel = Invoke-WebRequest -Uri "$BaseUrl/api/reports/$id/excel" -Headers @{ Authorization = "Bearer $($t['employeeA'])" } -OutFile $file -PassThru -SkipHttpErrorCheck
     Test-Check $name "Excel retorna 200 e .xlsx" ($excel.StatusCode -eq 200 -and $excel.Headers["Content-Disposition"] -match "report-$id\.xlsx") ""
     Test-Check $name "Planilha e um arquivo zip OOXML" ((Get-Content $file -AsByteStream -TotalCount 2) -join "," -eq "80,75") ""
     Test-Check $name "Planilha contem 3, 175, 150 e 25" (Test-Workbook $file @(3, 175, 150, 25)) ""
+    Remove-Item $file -ErrorAction SilentlyContinue
     Add-Logs $name "api" $id | Out-Null
     Add-Logs $name "worker" $id | Out-Null
 }
