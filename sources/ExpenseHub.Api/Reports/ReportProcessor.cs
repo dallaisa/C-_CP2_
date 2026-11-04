@@ -26,6 +26,13 @@ internal sealed class ReportProcessor(
 
         if (report.Status is ReportStatus.Completed or ReportStatus.Failed)
         {
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                logger.LogInformation(
+                    "Report {ReportId} is already {Status}; duplicate delivery ignored without new effect",
+                    reportId, report.Status);
+            }
+
             return true;
         }
 
