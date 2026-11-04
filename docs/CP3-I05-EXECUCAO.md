@@ -67,6 +67,9 @@ Preencha no `.env`:
 | `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | Conta Admin criada na primeira inicialização |
 
 O Compose se recusa a iniciar se qualquer uma estiver ausente (`${VAR:?mensagem}`). Não há valor padrão para credenciais.
+`SEED_ADMIN_PASSWORD` deve cumprir a política do ASP.NET Core Identity (6 ou mais caracteres, com maiúscula, minúscula, número e
+símbolo). Com uma senha fraca, a `api` encerra na inicialização, reinicia em loop e o `worker` não sobe; o log mostra a regra
+violada, nunca a senha. Evite `$`, `#`, aspas, `\` e espaços no `.env`.
 `RABBITMQ_DEFAULT_*` só inicializam um volume novo do RabbitMQ; em um volume existente use as credenciais já provisionadas.
 
 ## Execução

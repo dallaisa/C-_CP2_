@@ -91,17 +91,24 @@ O tratamento de publicação sem confirmação existe no código e é verificado
 (`ReportPublicationTests`, `ReportContractTests.UnconfirmedPublicationIsNotAFailedReport`); um experimento de interrupção do
 broker não é obrigatório.
 
-## O que já foi validado localmente
+## Ensaio do roteiro
 
-Sem Docker nem RabbitMQ, só o que não depende deles:
+Antes da rodada oficial, o roteiro foi executado de ponta a ponta contra o ambiente Docker Compose real (API, RabbitMQ e worker
+a partir das imagens publicadas do commit `4ee248d`), gravando as evidências em uma pasta temporária. Resultado final do
+ensaio: **41 verificações aprovadas e 0 falhas** em E01 a E05, e as evidências geradas não continham senhas, tokens nem o
+e-mail do Admin.
 
-| Item | Resultado |
-|---|---|
-| E04 contra a API real (SQLite temporário, sem broker) | 12 verificações aprovadas: 403 de escopo, 401 anônimo, 404 de detalhe e Excel alheios, isolamento da listagem |
-| Preparo de dados do E01 (criar, enviar, aprovar e pagar despesas) | Executado com sucesso; a solicitação respondeu 503 por não haver broker, como esperado |
-| Log de duplicata | Teste unitário `ReportContractTests.DuplicateDeliveryIsLoggedWithReportId` |
+O ensaio encontrou e corrigiu problemas que testes sem Docker não revelariam:
 
-O restante (E01 completo, E02, E03 e E05) exige as imagens publicadas e o ambiente Docker, e **ainda não foi executado**.
+| Achado | Natureza | Correção |
+|---|---|---|
+| `healthcheck.test.3 must be a string` no `compose.yaml` | Defeito da I05 (`Host: localhost` era lido como chave YAML) | Comando em bloco `>-` |
+| `api` reiniciando em loop com senha de Admin fraca | Configuração (política do Identity) | `.env.example` e `docs/CP3-I05-EXECUCAO.md` documentam a exigência |
+| Conferência da planilha não encontrava os números | Roteiro: o Open XML SDK grava `<x:v>`, com prefixo | Expressão regular tolerante ao prefixo |
+| Fila com `Ready`/`Unacked` defasados | Roteiro: estatísticas do RabbitMQ atualizam a cada ~5 s | Espera até a fila refletir o estado esperado |
+| Erro ao converter o retorno de `-match` | Roteiro | `Test-Check` converte para booleano internamente |
+
+Este ensaio **não substitui** a rodada oficial: os identificadores e a data do ensaio não entram no dossiê.
 
 ## Dossiê de evidências
 
