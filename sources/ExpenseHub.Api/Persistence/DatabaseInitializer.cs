@@ -38,6 +38,7 @@ internal static class DatabaseInitializer
             scope.ServiceProvider.GetRequiredService<ExpenseHubDbContext>();
 
         await dbContext.Database.EnsureCreatedAsync();
+        await ReportSchemaInitializer.InitializeAsync(dbContext);
         await SeedCategoriesAsync(dbContext);
 
         RoleManager<IdentityRole> roleManager =

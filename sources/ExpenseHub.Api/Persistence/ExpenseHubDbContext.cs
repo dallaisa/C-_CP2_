@@ -1,5 +1,6 @@
 using ExpenseHub.Api.Domain;
 using ExpenseHub.Api.Identity;
+using ExpenseHub.Api.Reports;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -30,15 +31,31 @@ internal sealed class ExpenseHubDbContext : IdentityDbContext<AppUser>
     /// <summary>Gets the payment records in the database.</summary>
     public DbSet<PaymentRecord> PaymentRecords => Set<PaymentRecord>();
 
+    /// <summary>Gets persisted report requests and snapshots.</summary>
+    public DbSet<Report> Reports => Set<Report>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
+        ConfigureReport(modelBuilder.Entity<Report>());
         ConfigureExpenseCategory(modelBuilder.Entity<ExpenseCategory>());
         ConfigureExpense(modelBuilder.Entity<Expense>());
         ConfigureExpenseHistory(modelBuilder.Entity<ExpenseHistory>());
         ConfigurePaymentRecord(modelBuilder.Entity<PaymentRecord>());
+    }
+
+    private static void ConfigureReport(EntityTypeBuilder<Report> reports)
+    {
+        reports.ToTable("Reports");
+        reports.HasKey(report => report.Id);
+        reports.Property(report => report.RequestedByUserId).IsRequired().HasMaxLength(450);
+        reports.HasIndex(report => report.RequestedByUserId);
+        reports.Property(report => report.Scope).HasConversion<string>().HasMaxLength(32);
+        reports.Property(report => report.Status).HasConversion<string>().HasMaxLength(32).IsConcurrencyToken();
+        reports.Property(report => report.ErrorCode).HasMaxLength(100);
+        reports.Property(report => report.ErrorMessage).HasMaxLength(500);
     }
 
     private static void ConfigureExpenseCategory(EntityTypeBuilder<ExpenseCategory> builder)
