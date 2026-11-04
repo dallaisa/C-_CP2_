@@ -69,17 +69,27 @@ Não coloque senhas em appsettings versionados, URLs, comandos com valores liter
 
 ## RabbitMQ local e execução
 
-Requer Docker com Compose e .NET SDK 10. O arquivo `infrastructure/compose.rabbitmq.yml` mantém
+Requer Docker com Compose 2.30+ (suporte a `env_file.format: raw`) e .NET SDK 10. O arquivo `infrastructure/compose.rabbitmq.yml` mantém
 os dados do broker em volume nomeado e expõe portas somente em localhost. O exemplo usa a tag
 `rabbitmq:4-management`; fixe versão/digest no ambiente de entrega da I06 para reprodutibilidade.
 
-Defina `RABBITMQ_USER` e `RABBITMQ_PASSWORD` externamente, por mecanismo seguro do ambiente.
+Crie uma única vez `infrastructure/rabbitmq.env` a partir de `infrastructure/rabbitmq.env.example`,
+sem sobrescrever um arquivo existente. O padrão versionado contém campos vazios, não credenciais.
+Preencha `RABBITMQ_DEFAULT_USER` e `RABBITMQ_DEFAULT_PASS` no arquivo local usando um editor seguro
+ou seu gerenciador de segredos. Restrinja o acesso ao arquivo (`chmod 600 infrastructure/rabbitmq.env`).
+Ele já é ignorado pela regra `*.env` do Git; não use `git add -f`.
+
+O formato raw preserva `$`, `#` e outros caracteres literalmente; não coloque aspas de shell ao redor
+dos valores e não execute esse arquivo com `source`. O Compose exige que o arquivo exista. Antes de
+iniciar o entrypoint oficial do RabbitMQ, o wrapper exige usuário e senha não vazios, evitando fallback
+para credenciais padrão. Em volume existente, utilize as credenciais já provisionadas; não apague dados.
+
+Configure também `RabbitMq__UserName` e `RabbitMq__Password` externamente, com os mesmos valores,
+para API e Worker. O arquivo do Compose não exporta variáveis para os processos no host.
 A partir da raiz do repositório, sem imprimir seus valores:
 
 ```sh
 docker compose -p expensehub-cp3 -f infrastructure/compose.rabbitmq.yml up -d
-export RabbitMq__UserName="$RABBITMQ_USER"
-export RabbitMq__Password="$RABBITMQ_PASSWORD"
 export RabbitMq__HostName=localhost
 export RabbitMq__QueueName=expensehub.reports
 export ConnectionStrings__ExpenseHub="Data Source=$PWD/sources/ExpenseHub.Api/expensehub.db"
@@ -262,3 +272,23 @@ Esses são pontos de integração; não declaram as issues I04/I05/I06 implement
 - [x] Identidade, escopo e período provenientes do banco; regras I02 preservadas.
 - [x] Falha de publicação explícita e janela sem outbox documentada.
 - [ ] Evidências de transporte e reinício com RabbitMQ real: executar no ambiente I05/I06.
+
+
+## Correção do alerta FIAP1002 na PR #13
+
+A regra `Test-CustomSecrets` em `scripts/Invoke-CodeQuality.ps1` faz correspondência textual por linha.
+Na interpolação antiga, ela reconhecia `PASSWORD:` dentro de `${RABBITMQ_PASSWORD:?...}` e capturava
+`?Defina` como valor, não a interpolação completa. Por isso, o teste de placeholder não se aplicava.
+O relatório do Actions confirmou FIAP1002 no Compose, linha 6; não havia senha literal nessa linha.
+
+As credenciais agora vêm de `rabbitmq.env` externo, obrigatório e não versionado. O exemplo contém
+somente campos vazios. O wrapper recusa campos vazios antes de iniciar o entrypoint oficial.
+Nenhuma regra do scanner, exceção ou configuração de autenticação foi relaxada. Fila durável,
+volume persistente e portas locais foram preservados.
+
+Validação local desta correção: 229 testes aprovados, verificação de formatação e `git diff --check`
+sem erros. A expressão de detecção foi reproduzida para confirmar a causa e a ausência do achado
+no Compose corrigido; o wrapper foi executado em `/bin/sh` com entradas descartáveis, verificando
+rejeição de usuário/senha ausentes ou vazios. Isso não substitui a execução do container.
+Docker, PowerShell e Gitleaks não estão instalados localmente; a execução integral do scanner é
+verificada pelo GitHub Actions após atualizar a PR existente.

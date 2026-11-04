@@ -1,9 +1,16 @@
 services:
   rabbitmq:
     image: rabbitmq:4-management
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Defina RABBITMQ_USER externamente}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Defina RABBITMQ_PASSWORD externamente}
+    env_file:
+      - path: ./rabbitmq.env
+        required: true
+        format: raw
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        : "$${RABBITMQ_DEFAULT_USER:?Configure o usuario no arquivo externo}"
+        : "$${RABBITMQ_DEFAULT_PASS:?Configure a senha no arquivo externo}"
+        exec docker-entrypoint.sh rabbitmq-server
     ports:
       - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
