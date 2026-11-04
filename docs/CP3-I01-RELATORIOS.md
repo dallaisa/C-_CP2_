@@ -42,7 +42,7 @@ Ter escopo Global não permite ler relatórios criados por outros usuários.
 
 | Rota | Sucesso | Falhas esperadas |
 |---|---|---|
-| `POST /api/reports` | Provisoriamente `201` com envelope Pending; `202` apenas com confirmação real | `400` entrada inválida; `401`; `403` role/escopo não autorizado |
+| `POST /api/reports` | `202` apenas com confirmação real; sem confirmação, `503` com ID salvo e erro sanitizado (CP3-I02) | `400` entrada inválida; `401`; `403` role/escopo não autorizado |
 | `GET /api/reports` | `200` array de envelopes próprios, mais recentes primeiro | `401`; `403` |
 | `GET /api/reports/{id}` | `200` envelope e resultado persistido | `401`; `403`; `404` inexistente/alheio |
 | `GET /api/reports/{id}/excel` | `200` arquivo XLSX da solicitação própria concluída | `401`; `403`; `404` inexistente/alheio; `409` própria não Completed |
@@ -128,8 +128,8 @@ Gerado com `DocumentFormat.OpenXml` 3.3.0 (MIT), formato Open XML real, não CSV
 ## Integração exata com CP3-I03
 
 A I01 **não executa worker automático**. `UnavailableReportPublisher` retorna `false` explicitamente,
-sem enviar mensagem. A solicitação fica Pending e o POST retorna `201` sem `Location`, apenas reconhecendo
-a persistência. O fluxo final de aceitação `202` depende da I03. Não se deve usar a resposta provisória
+sem enviar mensagem. A solicitação fica Pending e, desde a CP3-I02, o POST retorna `503` sem `Location`,
+com ID persistido e erro sanitizado. O fluxo final de aceitação `202` depende da I03. Não se deve usar essa resposta
 como prova de enfileiramento ou prometer que o relatório será processado nesta versão.
 
 1. Crie o projeto com assembly name `ExpenseHub.Worker` e referência ao projeto `ExpenseHub.Api`.
@@ -142,7 +142,8 @@ como prova de enfileiramento ou prometer que o relatório será processado nesta
    pelo publicador real. Retorne `true` somente após confirmação positiva real do broker; rejeição, timeout
    e confirmação incerta não podem retornar `true`. O handler já salva Pending antes de publicar e emite
    `202` + `Location: /api/reports/{id}` somente no ramo confirmado. Não marque Failed por timeout de publicação.
-   Defina na I03 a resposta de indisponibilidade para produção; o `201` atual é um contrato provisório da I01.
+   Preserve a resposta `503` com ID persistido e erro sanitizado implementada na CP3-I02 para ausência
+   de confirmação. O `201` provisório original foi substituído para atender à issue oficial #12.
 4. No host do worker, registre as mesmas dependências, com a mesma connection string:
 
    ```csharp
@@ -186,7 +187,7 @@ Testes adicionados em `sources/ExpenseHub.UnitTests/Reports`:
 |---|---|
 | ReportCalculatorTests | Exemplo oficial, Mine/Global, datas inclusivas, cinco estados, decimal, vazio, entrada e campos proibidos |
 | ReportProcessingTests | Estados, concorrência de claim via fake, snapshot imutável, falha sanitizada, reentrega, XLSX validado por OpenXmlValidator |
-| ReportEndpointTests | Matriz de acesso, identidade, persistência antes da confirmação, 201/202, ownership, 404/409 e download sem recálculo |
+| ReportEndpointTests | Matriz de acesso, identidade, persistência antes da confirmação, 503/202, ownership, 404/409 e download sem recálculo |
 | ReportHttpTests | Middleware real em TestServer: 401/403, binding 400, criação e leitura próprias, ausência de Location sem confirmação |
 | ReportTestSupport | Relógio fixo, store e publisher de teste; sem dependências externas |
 
@@ -205,3 +206,7 @@ autenticação substituta existe somente no projeto de testes; a API preserva o 
 - O pipeline PowerShell/Gitleaks completo não foi executado: `pwsh` e `gitleaks` não estão disponíveis neste
   ambiente. As configurações de qualidade e os analisadores existentes foram preservados.
 - O fluxo RabbitMQ real permanece sem validação, pois sua implementação pertence à CP3-I03.
+
+
+A validação acima registra a entrega original da I01. Para a evolução, 208 testes e contrato de falhas
+atualizado, consulte [CP3-I02-AUTORIZACAO.md](CP3-I02-AUTORIZACAO.md).
