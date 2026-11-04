@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -9,6 +10,8 @@ using ExpenseHub.Api.Reports;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace ExpenseHub.Api.Endpoints;
 
@@ -30,7 +33,7 @@ internal static class ReportEndpoints
     /// <summary>Validates and persists a request before attempting confirmed publication.</summary>
     internal static async Task<IResult> CreateAsync(
         ReportRequest request, ClaimsPrincipal principal, IReportStore store,
-        IReportPublisher publisher, TimeProvider clock, CancellationToken cancellationToken)
+        IReportPublisher publisher, TimeProvider clock, ILogger<Report> logger, CancellationToken cancellationToken)
     {
         string? userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(userId))
@@ -58,17 +61,43 @@ internal static class ReportEndpoints
             Status = ReportStatus.Pending,
             CreatedAt = clock.GetUtcNow().ToUniversalTime(),
         };
-        await store.AddAsync(report, cancellationToken);
-        bool confirmed = await publisher.PublishConfirmedAsync(report.Id, cancellationToken);
+        try
+        {
+            await store.AddAsync(report, cancellationToken);
+        }
+        catch (Exception exception) when (exception is DbException or DbUpdateException)
+        {
+            logger.LogError(exception, "Could not persist report request");
+            return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "REPORT_PERSISTENCE_UNAVAILABLE",
+                detail: "Não foi possível registrar a solicitação de relatório.");
+        }
+
+        bool confirmed;
+        try
+        {
+            confirmed = await publisher.PublishConfirmedAsync(report.Id, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Report publication was not confirmed for {ReportId}", report.Id);
+            confirmed = false;
+        }
+
         ReportResponse response = ReportResponse.FromReport(report);
         if (confirmed)
         {
             return Results.Accepted($"/api/reports/{report.Id}", response);
         }
 
-        // I01 persists the resource but cannot promise asynchronous acceptance without I03.
-        // No Location header or claim of publication is emitted on this provisional response.
-        return Results.Json(response, statusCode: StatusCodes.Status201Created);
+        // Publication uncertainty is not a calculation failure. Keep the persisted request Pending.
+        return Results.Json(new ReportPublicationFailure(report.Id,
+            new ReportError("REPORT_PUBLICATION_UNCONFIRMED", "A publicação do relatório não foi confirmada.")),
+            statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 
     /// <summary>Lists only the authenticated requester's saved envelopes.</summary>

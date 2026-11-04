@@ -810,9 +810,23 @@ O contrato completo, estados, respostas, Excel e passos de integração com o wo
 - O resultado e seu `generatedAt` são persistidos; consultas e downloads não recalculam despesas.
 
 **Integração I03 pendente:** o publicador padrão informa ausência de confirmação. Por isso, o POST
-retorna provisoriamente `201` sem `Location`, indicando somente que a solicitação foi persistida.
+retorna `503` sem `Location`, com o ID persistido e erro sanitizado, conforme o contrato complementar
+da CP3-I02. O registro permanece `Pending`; indisponibilidade de publicação não significa falha de cálculo.
 Nenhum processamento é disparado pela API. `202` e `Location` só são emitidos se um publicador real
 retornar confirmação do broker. Não existe RabbitMQ, worker automático ou confirmação simulada nesta issue.
 
 Os testes de relatórios usam fakes e transporte HTTP em memória, sem banco, rede ou broker reais.
 O SDK Open XML (licença MIT) gera a planilha e valida sua estrutura nos testes.
+
+
+## CP3-I02 — Autorização e isolamento de relatórios
+
+A matriz Employee/Mine e Auditor/Global, o isolamento por criador e o cálculo com dados persistidos
+foram reaproveitados da I01 e ampliados com testes HTTP para dois Employees e um Auditor.
+Identificador, solicitante, escopo, período e criação têm propriedades `init`, impedindo reatribuição
+normal depois da construção. O processador recebe apenas o ID, sem identidade ou escopo da mensagem.
+
+A [documentação da CP3-I02](docs/CP3-I02-AUTORIZACAO.md) descreve a matriz, códigos HTTP, casos negativos,
+validação e obrigações do futuro worker. A única mudança no retorno provisório da I01 é a adequação
+à issue oficial: publicação sem confirmação retorna `503` com ID salvo e erro sanitizado; não há
+simulação de broker ou processamento. A suíte completa agora contém 208 testes aprovados.
