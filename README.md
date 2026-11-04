@@ -809,11 +809,10 @@ O contrato completo, estados, respostas, Excel e passos de integração com o wo
 - O cálculo considera `ExpenseDate` inclusiva, valores `decimal`, os cinco estados e totais, inclusive zeros.
 - O resultado e seu `generatedAt` são persistidos; consultas e downloads não recalculam despesas.
 
-**Integração I03 pendente:** o publicador padrão informa ausência de confirmação. Por isso, o POST
-retorna `503` sem `Location`, com o ID persistido e erro sanitizado, conforme o contrato complementar
-da CP3-I02. O registro permanece `Pending`; indisponibilidade de publicação não significa falha de cálculo.
-Nenhum processamento é disparado pela API. `202` e `Location` só são emitidos se um publicador real
-retornar confirmação do broker. Não existe RabbitMQ, worker automático ou confirmação simulada nesta issue.
+**Integração I03 implementada:** a API usa `RabbitMqReportPublisher` e só retorna `202` com `Location`
+após confirmação real do broker. Ausência de confirmação retorna `503` com o ID salvo e erro sanitizado.
+O processo separado `ExpenseHub.Worker` calcula e confirma consumo após persistência, com idempotência
+persistente. Veja [CP3-I03-RABBITMQ-WORKER.md](docs/CP3-I03-RABBITMQ-WORKER.md) para configuração e limites.
 
 Os testes de relatórios usam fakes e transporte HTTP em memória, sem banco, rede ou broker reais.
 O SDK Open XML (licença MIT) gera a planilha e valida sua estrutura nos testes.
@@ -830,3 +829,18 @@ A [documentação da CP3-I02](docs/CP3-I02-AUTORIZACAO.md) descreve a matriz, c�
 validação e obrigações do futuro worker. A única mudança no retorno provisório da I01 é a adequação
 à issue oficial: publicação sem confirmação retorna `503` com ID salvo e erro sanitizado; não há
 simulação de broker ou processamento. A suíte completa agora contém 208 testes aprovados.
+
+
+## CP3-I03 — RabbitMQ, Worker e idempotência
+
+- Cliente RabbitMQ 7.2.1, fila durável `expensehub.reports`, mensagens persistentes contendo somente reportId.
+- Confirmação real antes de 202; 503 com ID persistido quando a confirmação não chega.
+- Worker independente, consumo manual e ACK apenas após salvar Completed/Failed ou reconhecer terminal salvo.
+- Retomada de Processing com concorrência por Status + StartedAt; duplicatas preservam resultado e GeneratedAt.
+- Retry limitado em escopos novos; falha de persistência não gera ACK; esgotamento encerra Worker com saída 1.
+- Credenciais externas, SQLite existente com caminho absoluto compartilhado e Compose com volume persistente.
+- 225 testes unitários + 4 testes de integração SQLite aprovados (229 no total).
+
+O [guia de execução e validação](docs/CP3-I03-RABBITMQ-WORKER.md) contém comandos, variáveis, comportamento
+de falhas e janela sem outbox. Docker/RabbitMQ não estão disponíveis no ambiente desta implementação;
+a execução com broker real permanece pendente para I05/I06. Não há alegação de entrega exatamente uma vez.

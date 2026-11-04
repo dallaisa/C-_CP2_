@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using ExpenseHub.Api.Endpoints;
 using ExpenseHub.Api.Expenses;
 using ExpenseHub.Api.Identity;
+using ExpenseHub.Api.Messaging;
 using ExpenseHub.Api.Persistence;
 using ExpenseHub.Api.Reports;
 using Microsoft.AspNetCore.Authorization;
@@ -36,7 +37,8 @@ internal static class Program
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddScoped<ExpenseService>();
         builder.Services.AddScoped<IReportStore, EfReportStore>();
-        builder.Services.AddSingleton<IReportPublisher, UnavailableReportPublisher>();
+        builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection("RabbitMq"));
+        builder.Services.AddSingleton<IReportPublisher, RabbitMqReportPublisher>();
         builder.Services.AddSingleton<ReportCalculator>();
         builder.Services.AddScoped<ReportProcessor>();
 

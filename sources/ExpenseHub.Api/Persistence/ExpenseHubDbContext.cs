@@ -54,6 +54,7 @@ internal sealed class ExpenseHubDbContext : IdentityDbContext<AppUser>
         reports.HasIndex(report => report.RequestedByUserId);
         reports.Property(report => report.Scope).HasConversion<string>().HasMaxLength(32);
         reports.Property(report => report.Status).HasConversion<string>().HasMaxLength(32).IsConcurrencyToken();
+        reports.Property(report => report.StartedAt).IsConcurrencyToken();
         reports.Property(report => report.ErrorCode).HasMaxLength(100);
         reports.Property(report => report.ErrorMessage).HasMaxLength(500);
     }

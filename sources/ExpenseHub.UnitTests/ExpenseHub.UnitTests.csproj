@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ExpenseHub.Api\ExpenseHub.Api.csproj" />
+    <ProjectReference Include="../ExpenseHub.Worker/ExpenseHub.Worker.csproj" />
   </ItemGroup>
 
 </Project>

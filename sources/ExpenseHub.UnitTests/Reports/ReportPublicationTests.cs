@@ -44,6 +44,26 @@ public sealed class ReportPublicationTests
         Assert.IsFalse(publisher.Called);
     }
 
+    /// <summary>The HTTP handler remains pending until the publisher reports an actual confirmation.</summary>
+    [TestMethod]
+    public async Task AcceptanceWaitsForPublisherConfirmation()
+    {
+        MemoryReportStore store = new MemoryReportStore();
+        WaitingPublisher publisher = new WaitingPublisher();
+        Task<IResult> response = CreateAsync(store, publisher);
+        Assert.HasCount(1, store.Reports);
+        Assert.IsFalse(response.IsCompleted);
+        publisher.Confirmation.SetResult(true);
+        Assert.AreEqual(202, ((IStatusCodeHttpResult)await response).StatusCode);
+    }
+
+    private sealed class WaitingPublisher : IReportPublisher
+    {
+        internal TaskCompletionSource<bool> Confirmation { get; } = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<bool> PublishConfirmedAsync(Guid reportId, CancellationToken cancellationToken) => Confirmation.Task;
+    }
+
     private static Task<IResult> CreateAsync(MemoryReportStore store, IReportPublisher publisher)
     {
         ClaimsPrincipal principal = new ClaimsPrincipal(new ClaimsIdentity(

@@ -87,17 +87,18 @@ public sealed class ReportProcessingTests
         Assert.IsNull(report.ResultJson);
     }
 
-    /// <summary>Missing and already-processing requests are not processed again.</summary>
+    /// <summary>Missing requests are not processed; abandoned Processing requests are resumed.</summary>
     [TestMethod]
-    public async Task MissingOrProcessingReportDoesNotCalculate()
+    public async Task MissingIsNotProcessedAndProcessingIsResumed()
     {
         MemoryReportStore store = new MemoryReportStore();
         Assert.IsFalse(await Processor(store).ProcessAsync(Guid.NewGuid(), CancellationToken.None));
         Report report = MemoryReportStore.Pending();
         report.Status = ReportStatus.Processing;
         store.Reports.Add(report);
-        Assert.IsFalse(await Processor(store).ProcessAsync(report.Id, CancellationToken.None));
-        Assert.AreEqual(0, store.ExpenseReads);
+        Assert.IsTrue(await Processor(store).ProcessAsync(report.Id, CancellationToken.None));
+        Assert.AreEqual(1, store.ExpenseReads);
+        Assert.AreEqual(ReportStatus.Completed, report.Status);
     }
 
     private static ReportProcessor Processor(MemoryReportStore store) => new ReportProcessor(

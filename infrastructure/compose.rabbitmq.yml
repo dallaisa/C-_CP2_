@@ -1,0 +1,25 @@
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    env_file:
+      - path: ./rabbitmq.env
+        required: true
+        format: raw
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        : "$${RABBITMQ_DEFAULT_USER:?Configure o usuario no arquivo externo}"
+        : "$${RABBITMQ_DEFAULT_PASS:?Configure a senha no arquivo externo}"
+        exec docker-entrypoint.sh rabbitmq-server
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+volumes:
+  rabbitmq-data:

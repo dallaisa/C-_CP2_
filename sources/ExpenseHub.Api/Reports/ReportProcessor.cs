@@ -1,19 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using ExpenseHub.Api.Domain;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace ExpenseHub.Api.Reports;
 
-/// <summary>Processes persisted requests; invoked by the future I03 worker, never by HTTP endpoints.</summary>
+/// <summary>Processes persisted requests from the independent worker, never from HTTP endpoints.</summary>
 internal sealed class ReportProcessor(
     IReportStore store, ReportCalculator calculator, TimeProvider clock, ILogger<ReportProcessor> logger)
 {
-    /// <summary>Claims Pending, computes once and persists a terminal snapshot or sanitized error.</summary>
-    /// <remarks>False means unclaimed or unsaved work; I03 must define retry and recovery handling.</remarks>
+    /// <summary>Claims Pending or reclaims Processing and fences terminal writes by state and attempt timestamp.</summary>
+    /// <remarks>False means missing, unclaimed or unsaved work; never acknowledge it as a saved terminal result.</remarks>
     internal async Task<bool> ProcessAsync(Guid reportId, CancellationToken cancellationToken)
     {
         Report? report = await store.FindAsync(reportId, cancellationToken);
@@ -27,16 +29,19 @@ internal sealed class ReportProcessor(
             return true;
         }
 
-        if (report.Status != ReportStatus.Pending)
+        DateTimeOffset now = clock.GetUtcNow().ToUniversalTime();
+        // Strictly advances even with clock skew or fixed clocks. EF compares the previous value
+        // as well as Status, so an older attempt cannot overwrite a reclaimed or terminal report.
+        report.StartedAt = report.StartedAt is { } previous && now <= previous ? previous.AddTicks(1) : now;
+        report.Status = ReportStatus.Processing;
+        if (!await store.SaveAsync(cancellationToken))
         {
             return false;
         }
 
-        report.Status = ReportStatus.Processing;
-        report.StartedAt = clock.GetUtcNow().ToUniversalTime();
-        if (!await store.SaveAsync(cancellationToken))
+        if (logger.IsEnabled(LogLevel.Information))
         {
-            return false;
+            logger.LogInformation("Processing report {ReportId}", reportId);
         }
 
         try
@@ -49,7 +54,7 @@ internal sealed class ReportProcessor(
             report.ErrorCode = null;
             report.ErrorMessage = null;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (Exception exception) when (exception is DbException or DbUpdateException or OperationCanceledException)
         {
             throw;
         }
@@ -63,6 +68,12 @@ internal sealed class ReportProcessor(
         }
 
         report.CompletedAt = clock.GetUtcNow().ToUniversalTime();
-        return await store.SaveAsync(cancellationToken);
+        bool saved = await store.SaveAsync(cancellationToken);
+        if (saved && logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation("Report {ReportId} saved as {Status}", reportId, report.Status);
+        }
+
+        return saved;
     }
 }
