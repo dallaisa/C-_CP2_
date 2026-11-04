@@ -1,0 +1,80 @@
+# ExpenseHub — execucao a partir das imagens publicadas (CP3-I05).
+# Requer um arquivo .env (modelo: .env.example). Nenhum segredo e versionado.
+#
+#   docker compose pull
+#   docker compose up -d
+#   docker compose ps
+name: expensehub
+
+x-rabbitmq-client: &rabbitmq-client
+  RabbitMq__HostName: rabbitmq
+  RabbitMq__Port: "5672"
+  RabbitMq__QueueName: expensehub.reports
+  RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:?Defina RABBITMQ_DEFAULT_USER no .env}
+  RabbitMq__Password: "${RABBITMQ_DEFAULT_PASS:?Defina RABBITMQ_DEFAULT_PASS no .env}"
+
+services:
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    # O no do RabbitMQ deriva do hostname. Fixo, para que recriar o contêiner
+    # reencontre a fila duravel e as mensagens persistidas no volume.
+    hostname: expensehub-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?Defina RABBITMQ_DEFAULT_USER no .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Defina RABBITMQ_DEFAULT_PASS no .env}
+    ports:
+      - "127.0.0.1:15672:15672" # painel de gerenciamento, somente localhost
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  api:
+    image: ${IMAGE_REGISTRY:-ghcr.io/dallaisa}/expensehub-api:${IMAGE_TAG:?Defina IMAGE_TAG (commit completo) no .env}
+    environment:
+      <<: *rabbitmq-client
+      ConnectionStrings__ExpenseHub: Data Source=/data/expensehub.db
+      DataProtection__KeysPath: /data/keys
+      SeedAdmin__Email: ${SEED_ADMIN_EMAIL:?Defina SEED_ADMIN_EMAIL no .env}
+      SeedAdmin__Password: "${SEED_ADMIN_PASSWORD:?Defina SEED_ADMIN_PASSWORD no .env}"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - expensehub-data:/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # A imagem aspnet nao traz curl; usa o /dev/tcp do bash.
+      test:
+        - CMD
+        - bash
+        - -c
+        - exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 && grep -q '"status":"ok"' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    restart: unless-stopped
+
+  worker:
+    image: ${IMAGE_REGISTRY:-ghcr.io/dallaisa}/expensehub-worker:${IMAGE_TAG:?Defina IMAGE_TAG (commit completo) no .env}
+    environment:
+      <<: *rabbitmq-client
+      # Mesmo arquivo do servico api: web e worker nunca usam bases diferentes.
+      ConnectionStrings__ExpenseHub: Data Source=/data/expensehub.db
+    volumes:
+      - expensehub-data:/data
+    depends_on:
+      # A api cria o esquema; o worker nao cria um banco vazio por conta propria.
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  rabbitmq-data:
+  expensehub-data:
