@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ExpenseHub.Api.Domain;
 using ExpenseHub.Api.Reports;
+using Microsoft.EntityFrameworkCore;
 
 namespace ExpenseHub.UnitTests.Reports;
 
@@ -23,6 +24,8 @@ internal sealed class MemoryReportStore : IReportStore
 
     internal int ExpenseReads { get; private set; }
 
+    internal bool ThrowOnAdd { get; set; }
+
     internal bool ThrowOnRead { get; set; }
 
     internal bool SaveSucceeds { get; set; } = true;
@@ -31,6 +34,11 @@ internal sealed class MemoryReportStore : IReportStore
 
     public Task AddAsync(Report report, CancellationToken cancellationToken)
     {
+        if (ThrowOnAdd)
+        {
+            throw new DbUpdateException("sensitive database details");
+        }
+
         Reports.Add(report);
         return Task.CompletedTask;
     }
@@ -76,10 +84,13 @@ internal sealed class MemoryReportStore : IReportStore
 
 internal sealed class ConfirmingPublisher(MemoryReportStore store, bool confirmed) : IReportPublisher
 {
+    internal bool Called { get; private set; }
+
     internal bool SawPersistedPending { get; private set; }
 
     public Task<bool> PublishConfirmedAsync(Guid reportId, CancellationToken cancellationToken)
     {
+        Called = true;
         SawPersistedPending = store.Reports.Any(report => report.Id == reportId && report.Status == ReportStatus.Pending);
         return Task.FromResult(confirmed);
     }

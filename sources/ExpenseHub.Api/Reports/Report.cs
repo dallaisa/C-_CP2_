@@ -6,26 +6,26 @@ namespace ExpenseHub.Api.Reports;
 /// <summary>Stores a report request and its serialized, immutable result.</summary>
 internal sealed class Report
 {
-    /// <summary>Gets or sets the server-generated identifier.</summary>
-    public Guid Id { get; set; }
+    /// <summary>Gets the server-generated identifier.</summary>
+    public Guid Id { get; init; }
 
-    /// <summary>Gets or sets the authenticated requester.</summary>
-    public string RequestedByUserId { get; set; } = string.Empty;
+    /// <summary>Gets the authenticated requester.</summary>
+    public string RequestedByUserId { get; init; } = string.Empty;
 
-    /// <summary>Gets or sets the inclusive first expense date.</summary>
-    public DateOnly FromDate { get; set; }
+    /// <summary>Gets the inclusive first expense date.</summary>
+    public DateOnly FromDate { get; init; }
 
-    /// <summary>Gets or sets the inclusive last expense date.</summary>
-    public DateOnly ToDate { get; set; }
+    /// <summary>Gets the inclusive last expense date.</summary>
+    public DateOnly ToDate { get; init; }
 
-    /// <summary>Gets or sets the authorized scope.</summary>
-    public ReportScope Scope { get; set; }
+    /// <summary>Gets the authorized scope.</summary>
+    public ReportScope Scope { get; init; }
 
     /// <summary>Gets or sets the processing state, used for optimistic concurrency.</summary>
     public ReportStatus Status { get; set; }
 
-    /// <summary>Gets or sets the UTC creation instant.</summary>
-    public DateTimeOffset CreatedAt { get; set; }
+    /// <summary>Gets the UTC creation instant.</summary>
+    public DateTimeOffset CreatedAt { get; init; }
 
     /// <summary>Gets or sets the UTC processing start.</summary>
     public DateTimeOffset? StartedAt { get; set; }

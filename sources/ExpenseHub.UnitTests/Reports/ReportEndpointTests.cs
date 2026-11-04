@@ -7,6 +7,7 @@ using ExpenseHub.Api.Endpoints;
 using ExpenseHub.Api.Reports;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace ExpenseHub.UnitTests.Reports;
@@ -34,7 +35,7 @@ public sealed class ReportEndpointTests
     {
         MemoryReportStore store = new MemoryReportStore();
         IResult result = await ReportEndpoints.CreateAsync(Request(scope), Principal("owner", roles), store,
-            new UnavailableReportPublisher(), new ReportTestClock(), CancellationToken.None);
+            new UnavailableReportPublisher(), new ReportTestClock(), NullLogger<Report>.Instance, CancellationToken.None);
         if (!allowed)
         {
             Assert.IsInstanceOfType<ForbidHttpResult>(result);
@@ -42,7 +43,7 @@ public sealed class ReportEndpointTests
             return;
         }
 
-        Assert.AreEqual(201, ((IStatusCodeHttpResult)result).StatusCode);
+        Assert.AreEqual(503, ((IStatusCodeHttpResult)result).StatusCode);
         Report report = store.Reports.Single();
         Assert.AreNotEqual(Guid.Empty, report.Id);
         Assert.AreEqual("owner", report.RequestedByUserId);
@@ -61,7 +62,7 @@ public sealed class ReportEndpointTests
         MemoryReportStore store = new MemoryReportStore();
         ConfirmingPublisher publisher = new ConfirmingPublisher(store, true);
         IResult result = await ReportEndpoints.CreateAsync(Request("Mine"), Principal("owner", "Employee"), store,
-            publisher, new ReportTestClock(), CancellationToken.None);
+            publisher, new ReportTestClock(), NullLogger<Report>.Instance, CancellationToken.None);
         Assert.IsTrue(publisher.SawPersistedPending);
         Accepted<ReportResponse> accepted = (Accepted<ReportResponse>)result;
         Assert.AreEqual(202, accepted.StatusCode);
@@ -77,8 +78,8 @@ public sealed class ReportEndpointTests
         for (int index = 0; index < 2; index++)
         {
             IResult result = await ReportEndpoints.CreateAsync(Request("Mine"), Principal("owner", "Employee"), store,
-                publisher, new ReportTestClock(), CancellationToken.None);
-            Assert.AreEqual(201, ((IStatusCodeHttpResult)result).StatusCode);
+                publisher, new ReportTestClock(), NullLogger<Report>.Instance, CancellationToken.None);
+            Assert.AreEqual(503, ((IStatusCodeHttpResult)result).StatusCode);
         }
 
         Assert.IsTrue(publisher.SawPersistedPending);
@@ -92,10 +93,10 @@ public sealed class ReportEndpointTests
     {
         MemoryReportStore store = new MemoryReportStore();
         IResult bad = await ReportEndpoints.CreateAsync(new ReportRequest(null, null, "Mine"), Principal("owner", "Employee"), store,
-            new UnavailableReportPublisher(), new ReportTestClock(), CancellationToken.None);
+            new UnavailableReportPublisher(), new ReportTestClock(), NullLogger<Report>.Instance, CancellationToken.None);
         Assert.AreEqual(400, ((IStatusCodeHttpResult)bad).StatusCode);
         IResult anonymous = await ReportEndpoints.CreateAsync(Request("Mine"), new ClaimsPrincipal(), store,
-            new UnavailableReportPublisher(), new ReportTestClock(), CancellationToken.None);
+            new UnavailableReportPublisher(), new ReportTestClock(), NullLogger<Report>.Instance, CancellationToken.None);
         Assert.AreEqual(401, ((IStatusCodeHttpResult)anonymous).StatusCode);
         Assert.IsEmpty(store.Reports);
     }
