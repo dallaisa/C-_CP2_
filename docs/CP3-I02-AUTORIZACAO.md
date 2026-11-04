@@ -1,5 +1,11 @@
 # CP3-I02 — Autorização e isolamento
 
+> Evolução CP3-I03: o publicador real e o Worker separado agora estão implementados.
+> As seções de integração pendente abaixo registram a entrega original e foram sucedidas por
+> [CP3-I03-RABBITMQ-WORKER.md](CP3-I03-RABBITMQ-WORKER.md), que descreve a retomada de Processing,
+> retries limitados e confirmação real. Permanecem válidos os contratos de cálculo e autorização.
+
+
 Referência: [Racass/checkpoint-csharpracass-expensehub#12](https://github.com/Racass/checkpoint-csharpracass-expensehub/issues/12).
 
 ## Análise e reaproveitamento da I01
