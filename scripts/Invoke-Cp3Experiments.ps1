@@ -67,9 +67,11 @@ function Write-Evidence([string]$Name, [string]$Text) {
     Add-Content -Path (Join-Path $OutputDirectory "$Name.md") -Value (Protect-Text $Text) -Encoding utf8
 }
 
-function Test-Check([string]$Name, [string]$Check, [bool]$Condition, [string]$Detail = "") {
-    $mark = if ($Condition) { "PASS" } else { "FAIL" }
-    if (-not $Condition) { $script:Failures++ }
+function Test-Check([string]$Name, [string]$Check, $Condition, [string]$Detail = "") {
+    # Aceita qualquer valor (inclusive o array que -match devolve) e converte aqui para booleano.
+    $passed = [bool]$Condition
+    $mark = if ($passed) { "PASS" } else { "FAIL" }
+    if (-not $passed) { $script:Failures++ }
     Write-Evidence $Name "- [$mark] $Check $Detail"
     Write-Host "[$mark] $Name - $Check $Detail"
 }
@@ -99,6 +101,28 @@ function Get-RabbitQueue {
     $queue = Invoke-RestMethod -Uri "$ManagementUrl/api/queues/%2F/$QueueName" -Credential $credential `
         -AllowUnencryptedAuthentication -Authentication Basic
     return [pscustomobject]@{ Ready = [int]$queue.messages_ready; Unacked = [int]$queue.messages_unacknowledged }
+}
+
+function Wait-QueueMessage {
+    # Com o worker parado a mensagem fica Ready; espera a estatistica do broker refletir a publicacao.
+    $deadline = (Get-Date).AddSeconds(30)
+    do {
+        Start-Sleep -Seconds 3
+        $queue = Get-RabbitQueue
+        if ($queue.Ready -ge 1) { break }
+    } while ((Get-Date) -lt $deadline)
+    return $queue
+}
+
+function Wait-QueueDrained {
+    # As estatisticas da API de gerenciamento atualizam a cada ~5 s; espera ate a fila esvaziar.
+    $deadline = (Get-Date).AddSeconds(30)
+    do {
+        Start-Sleep -Seconds 3
+        $queue = Get-RabbitQueue
+        if ($queue.Ready -eq 0 -and $queue.Unacked -eq 0) { break }
+    } while ((Get-Date) -lt $deadline)
+    return $queue
 }
 
 function Publish-Duplicate([string]$ReportId) {
@@ -190,7 +214,7 @@ function Test-Workbook([string]$Path, [decimal[]]$Numbers) {
         $reader = [System.IO.StreamReader]::new($sheet.Open())
         $xml = $reader.ReadToEnd(); $reader.Dispose()
     } finally { $zip.Dispose() }
-    $values = [regex]::Matches($xml, "<v>([^<]+)</v>") | ForEach-Object { [decimal]::Parse($_.Groups[1].Value, [cultureinfo]::InvariantCulture) }
+    $values = [regex]::Matches($xml, "<(?:\w+:)?v>([^<]+)</(?:\w+:)?v>") | ForEach-Object { [decimal]::Parse($_.Groups[1].Value, [cultureinfo]::InvariantCulture) }
     foreach ($number in $Numbers) { if ($values -notcontains $number) { return $false } }
     return $true
 }
@@ -239,8 +263,7 @@ function Invoke-E02 {
     $id = $created.Json.id; $script:Context["E02ReportId"] = $id
     Write-Evidence $name "reportId: ``$id``"
     Test-Check $name "POST retorna 202 com o worker parado" ($created.Status -eq 202) "(HTTP $($created.Status))"
-    Start-Sleep -Seconds 3
-    $queue = Get-RabbitQueue
+    $queue = Wait-QueueMessage
     Test-Check $name "RabbitMQ: mensagem Ready na fila" ($queue.Ready -ge 1) "(Ready=$($queue.Ready), Unacked=$($queue.Unacked))"
     $pending = Invoke-Api "GET" "/api/reports/$id" $t["employeeA"] $null
     Test-Check $name "Relatorio continua Pending" ($pending.Json.status -eq "Pending") ""
@@ -249,8 +272,7 @@ function Invoke-E02 {
     docker compose up -d worker | Out-Null
     $done = Wait-Report $id $t["employeeA"] "Completed"
     Test-Check $name "Mesmo reportId chega a Completed" ($done.Json.status -eq "Completed" -and $done.Json.id -eq $id) ""
-    Start-Sleep -Seconds 2
-    $after = Get-RabbitQueue
+    $after = Wait-QueueDrained
     Test-Check $name "Fila esvaziada (Ready=0, Unacked=0)" ($after.Ready -eq 0 -and $after.Unacked -eq 0) "(Ready=$($after.Ready), Unacked=$($after.Unacked))"
     Add-Logs $name "worker" $id | Out-Null
 }
@@ -274,7 +296,7 @@ function Invoke-E03 {
     Test-Check $name "Resultado identico" (($before.Json.result | ConvertTo-Json -Depth 6 -Compress) -eq ($after.Json.result | ConvertTo-Json -Depth 6 -Compress)) ""
     Test-Check $name "generatedAt e completedAt inalterados" ($before.Json.result.generatedAt -eq $after.Json.result.generatedAt -and $before.Json.completedAt -eq $after.Json.completedAt) ""
     Test-Check $name "Quantidade de solicitacoes inalterada" ($countBefore -eq $countAfter) "($countBefore -> $countAfter)"
-    $queue = Get-RabbitQueue
+    $queue = Wait-QueueDrained
     Test-Check $name "Fila vazia apos consumo (ACK)" ($queue.Ready -eq 0 -and $queue.Unacked -eq 0) ""
     $lines = Add-Logs $name "worker" $id
     Test-Check $name "Log do worker registra duplicata ignorada" (@($lines | Where-Object { $_ -match "duplicate delivery ignored" }).Count -ge 1) ""
