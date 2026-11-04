@@ -95,3 +95,10 @@ internal sealed class ConfirmingPublisher(MemoryReportStore store, bool confirme
         return Task.FromResult(confirmed);
     }
 }
+
+// Tests explicitly model absent confirmation; production always uses RabbitMqReportPublisher.
+internal sealed class UnavailableReportPublisher : IReportPublisher
+{
+    public Task<bool> PublishConfirmedAsync(Guid reportId, CancellationToken cancellationToken)
+        => Task.FromResult(false);
+}

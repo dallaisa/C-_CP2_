@@ -14,10 +14,12 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+    <PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="ExpenseHub.UnitTests" />
+    <InternalsVisibleTo Include="ExpenseHub.IntegrationTests" />
     <InternalsVisibleTo Include="ExpenseHub.Worker" />
   </ItemGroup>
 
