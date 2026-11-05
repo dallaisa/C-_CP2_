@@ -117,15 +117,15 @@ Preencher após a execução, colando as linhas `[PASS]`/`[FAIL]` e os `reportId
 
 | Item | Valor |
 |---|---|
-| Commit final / `IMAGE_TAG` | _a preencher_ |
-| Imagens | `ghcr.io/dallaisa/expensehub-api:<commit>` · `ghcr.io/dallaisa/expensehub-worker:<commit>` |
-| Data e hora (UTC) da execução | _a preencher_ |
-| E01 — reportId e resultado | _a preencher_ |
-| E02 — reportId, Ready antes/depois | _a preencher_ |
-| E03 — reportId, comparação antes/depois e log de duplicata | _a preencher_ |
-| E04 — resultado das verificações | _a preencher_ |
-| E05 — revisão antes/depois e resultado preservado | _a preencher_ |
-| Falhas encontradas e explicação | _a preencher_ |
+| Commit final / `IMAGE_TAG` | `52443052bab09fc7e4da4aa9acb6a39041bc8387` (`5244305`, merge da PR #18) |
+| Imagens | `ghcr.io/dallaisa/expensehub-api:52443052bab09fc7e4da4aa9acb6a39041bc8387` · `ghcr.io/dallaisa/expensehub-worker:52443052bab09fc7e4da4aa9acb6a39041bc8387` (públicas; rótulo `org.opencontainers.image.revision` igual ao SHA) |
+| Data e hora (UTC) da execução | 04/11/2026, execução `20261104222945` (arquivos em `docs/evidencias/cp3-i06/`) |
+| E01 — reportId e resultado | `9101475a-406b-4013-9678-1cd33181835e`: 202 com `Location`; `Completed` com `totalCount` 3 e `totalAmount` 175; Approved 2/150 e Paid 1/25; cinco estados; Excel 200 `.xlsx` com 3, 175, 150 e 25. 9 de 9 verificações. Logs: `publication confirmed` (api); `Processing`, `saved as Completed`, `delivery acknowledged after persistence` (worker) |
+| E02 — reportId, Ready antes/depois | `40d0370b-1832-413d-86cf-74438ed48289`: com o worker parado, 202; fila `Ready=1, Unacked=0`; relatório `Pending`; Excel 409. Após subir o worker, o mesmo id chegou a `Completed` e a fila ficou `Ready=0, Unacked=0`. 6 de 6 verificações |
+| E03 — reportId, comparação antes/depois e log de duplicata | `9101475a-406b-4013-9678-1cd33181835e` (concluído no E01): worker reiniciado e `{"reportId":"…"}` republicado (`routed`). Resultado, `generatedAt` e `completedAt` idênticos; solicitações 2 → 2; fila vazia. Log: `Report … is already Completed; duplicate delivery ignored without new effect`. 6 de 6 verificações |
+| E04 — resultado das verificações | 12 de 12: Employee não solicita Global (403); Auditor não solicita Mine (403) e solicita Global (202); anônimo 401; detalhe e Excel alheios 404 para Employee B e para o Auditor; listagem do Auditor sem o relatório alheio; Employee A lê o próprio relatório (200). Relatório de controle: `f44747d7-b9bb-4170-9b1d-d38997ea508c` |
+| E05 — revisão antes/depois e resultado preservado | Revisão `api` e `worker` = `IMAGE_TAG` antes e depois de `docker compose up -d --force-recreate api worker` (sem remover volumes). Resultado do relatório `9101475a-…` idêntico, status `Completed` e Excel ainda baixável. 8 de 8 verificações |
+| Falhas encontradas e explicação | Rodada oficial: **0 falhas em 41 verificações** (E01 9, E02 6, E03 6, E04 12, E05 8). Os problemas achados no ensaio anterior estão descritos em "Ensaio do roteiro" e foram corrigidos antes desta rodada. Os experimentos rodaram sobre as imagens de `5244305`; o commit final da entrega só acrescenta documentação e evidências, sem alterar o código |
 
 ## Limitações
 
