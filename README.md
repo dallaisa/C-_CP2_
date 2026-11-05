@@ -1,3 +1,9 @@
+## Equipe para o Checkpoint 3
+
+| Nome | RM | GitHub | Checkpoint 3 |
+|---|---|---|---|
+| Isabelle Dallabeneta Carlesso | 554592 | [dallaisa](https://github.com/dallaisa) | CP3-I01 a CP3-I04 |
+| Pedro Almeida e Camacho | 556831 | [Pedro-Camacho](https://github.com/Pedro-Camacho) | CP3-I04 a CP3-I07 |
 # ExpenseHub — I01 a I10
 
 Versão preparada para concluir:
