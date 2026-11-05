@@ -13,6 +13,9 @@ Versão preparada para concluir:
 - **I09 — Testes unitários**
 - **I10 — Qualidade de Código**
 
+O **Checkpoint 3 (CP3-I01 a I07)**, com relatórios assíncronos, RabbitMQ, worker, imagens publicadas e experimentos, está
+descrito a partir da seção [CP3-I01](#cp3-i01--relatórios-de-reembolsos) e em [Como executar o CP3](#como-executar-o-cp3-docker-compose).
+
 ## I01 implementada
 
 - API e projeto de testes mantidos na solução;
@@ -842,5 +845,89 @@ simulação de broker ou processamento. A suíte completa agora contém 208 test
 - 225 testes unitários + 4 testes de integração SQLite aprovados (229 no total).
 
 O [guia de execução e validação](docs/CP3-I03-RABBITMQ-WORKER.md) contém comandos, variáveis, comportamento
-de falhas e janela sem outbox. Docker/RabbitMQ não estão disponíveis no ambiente desta implementação;
-a execução com broker real permanece pendente para I05/I06. Não há alegação de entrega exatamente uma vez.
+de falhas e janela sem outbox. A execução com broker real foi feita na I06 (veja
+[Como executar o CP3](#como-executar-o-cp3-docker-compose)). Não há alegação de entrega exatamente uma vez.
+
+
+## CP3-I04 — Testes próprios significativos
+
+Testes de comportamento para cálculo, autorização, isolamento, idempotência, resultado persistido e Excel, sem banco,
+rede, RabbitMQ ou Docker nos testes unitários. Estado atual: **242 testes unitários e 6 de integração (SQLite descartável)**.
+
+```powershell
+dotnet test sources/ExpenseHub.UnitTests/ExpenseHub.UnitTests.csproj
+dotnet test sources/ExpenseHub.IntegrationTests/ExpenseHub.IntegrationTests.csproj
+```
+
+O mapeamento de cada critério para classe e método está em [docs/CP3-I04-TESTES.md](docs/CP3-I04-TESTES.md).
+
+
+## CP3-I05 — Publicação e execução reproduzível
+
+- Dockerfiles da web (`sources/ExpenseHub.Api/Dockerfile`) e do worker (`sources/ExpenseHub.Worker/Dockerfile`).
+- O workflow `publish-images` publica as imagens no GitHub Container Registry **somente depois de build e testes**, com tag
+  igual ao **SHA completo do commit**. Não há tag `latest`.
+- `compose.yaml` executa `rabbitmq`, `api` e `worker` a partir das imagens publicadas, com o mesmo SQLite em volume nomeado e
+  chaves de autenticação persistentes. Configuração e segredos ficam em um `.env` fora do Git (modelo: `.env.example`).
+
+Detalhes, acesso às imagens e limitações em [docs/CP3-I05-EXECUCAO.md](docs/CP3-I05-EXECUCAO.md).
+
+
+## CP3-I06 — Experimentos e diagnóstico
+
+O roteiro `scripts/Invoke-Cp3Experiments.ps1` executa E01 a E05 contra o ambiente Compose e grava evidências sanitizadas em
+[docs/evidencias/cp3-i06/](docs/evidencias/cp3-i06/). Na rodada oficial, sobre as imagens do commit `5244305`:
+**41 verificações aprovadas, 0 falhas**.
+
+| Experimento | Resultado |
+|---|---|
+| E01 — fluxo normal | 202, `Completed` com 3 reembolsos e R$ 175, Excel `.xlsx` válido |
+| E02 — worker parado | mensagem `Ready` na fila e relatório `Pending`; ao retomar, o mesmo id conclui |
+| E03 — duplicata | mensagem republicada: resultado e carimbos idênticos, log de duplicata ignorada |
+| E04 — isolamento | 403, 401 e 404 de detalhe e Excel alheios, inclusive para o Auditor |
+| E05 — persistência e versão | `api` e `worker` recriados: mesma versão e resultado preservado |
+
+O dossiê, o diagnóstico (aceitação × conclusão, worker parado × broker indisponível × janela sem outbox) e os
+identificadores estão em [docs/CP3-I06-EXPERIMENTOS.md](docs/CP3-I06-EXPERIMENTOS.md).
+
+
+## CP3-I07 — Qualidade objetiva das alterações
+
+Comparação entre o commit do CP2 e o estado atual: 0 avisos de build nos dois, configuração de analisadores inalterada,
+sem supressões novas e sem binários ou segredos versionados. Veja [docs/CP3-I07-QUALIDADE.md](docs/CP3-I07-QUALIDADE.md).
+
+
+## Como executar o CP3 (Docker Compose)
+
+Requer Docker com Compose 2.30+ e PowerShell 7 para o roteiro de experimentos.
+
+```powershell
+Copy-Item .env.example .env   # preencha; IMAGE_TAG = SHA completo do commit publicado
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+No `.env`, `SEED_ADMIN_PASSWORD` deve ter maiúscula, minúscula, número e símbolo (política do Identity), e os valores não devem
+conter `$`, `#`, aspas, `\` ou espaços. Para parar sem apagar dados: `docker compose stop`. **Não use `docker compose down -v`.**
+
+A API fica em `http://localhost:8080` e o painel do RabbitMQ em `http://localhost:15672`. As chamadas de relatório estão em
+`sources/ExpenseHub.Api/ExpenseHub.Reports.http`. Para rodar os cinco experimentos:
+
+```powershell
+pwsh scripts/Invoke-Cp3Experiments.ps1 -Experiment All
+```
+
+### Evidências
+
+Fila durável `expensehub.reports` no painel do RabbitMQ (etiqueta `D` = durable):
+
+![Fila durável expensehub.reports no painel do RabbitMQ](docs/images/rabbitmq-fila.png)
+
+Serviços saudáveis e imagens identificadas pelo SHA do commit:
+
+![docker compose ps e images com as imagens pelo SHA do commit](docs/images/compose-images.png)
+
+Relatório concluído exportado em Excel (3 reembolsos, total R$ 175):
+
+![Planilha do relatório aberta no Excel](docs/images/excel-aberto.png)
